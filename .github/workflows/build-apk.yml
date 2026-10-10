@@ -2,7 +2,6 @@ name: Build APK
 
 on:
   push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,27 +13,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
+      # GitHub's runners already include the Android SDK, so no setup step is needed
       - name: Build the APK
         working-directory: captionsmith-android
         run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
           cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Captionsmith.apk"
 
-      - name: Keep the APK with this run
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: Captionsmith-apk
           path: Captionsmith.apk
 
-      - name: Publish it as a download
+      - name: Publish as a download (Releases page)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
