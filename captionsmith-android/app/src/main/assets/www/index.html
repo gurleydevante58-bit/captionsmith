@@ -245,6 +245,7 @@ table.keys td:first-child{white-space:nowrap;width:1%;padding-right:14px}
           <button class="btn small" id="zoomOut" aria-label="Zoom out">−</button>
           <button class="btn small" id="zoomIn" aria-label="Zoom in">+</button>
           <button class="btn small" id="zoomFit">Fit</button>
+          <button class="btn small danger" id="removeVid" hidden>Remove video</button>
           <span class="hint" id="tlHint">Tap to seek · select a caption to drag it</span>
         </div>
       </div>
@@ -830,7 +831,28 @@ $('#stepFwd').onclick = () => { pause(); seek(curTime() + frameStep()); };
 $('#guidesBtn').onclick = () => { mutate(() => P.layout.showGuides = !P.layout.showGuides, null, { panel: curTab === 'layout' }); $('#guidesBtn').setAttribute('aria-pressed', P.layout.showGuides); };
 $('#undoBtn').onclick = undo; $('#redoBtn').onclick = redo;
 $('#projName').addEventListener('change', e => mutate(() => P.name = e.target.value.trim() || 'Untitled project', 'name', { panel: false }));
-pc.addEventListener('click', () => togglePlay());
+/* Tap the preview to play/pause; drag it to move captions (whatever the Style target is: all, this line, or selected words' line) */
+const pv = { down: null };
+pc.addEventListener('pointerdown', e => { pc.setPointerCapture(e.pointerId); const r = pc.getBoundingClientRect(); const st = effStyle(); pv.down = { x: e.clientX, y: e.clientY, r, px: st.posX, py: st.posY, moved: false, key: 'pvdrag' + Date.now() }; });
+pc.addEventListener('pointermove', e => {
+  const d = pv.down; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if (!d.moved && Math.hypot(dx, dy) < 8) return; d.moved = true;
+  const L = P.layout, sw = d.r.width * (1 - L.safeLeft - L.safeRight), sh = d.r.height * (1 - L.safeTop - L.safeBottom);
+  const nx = clamp(d.px + dx / Math.max(1, sw), 0, 1), ny = clamp(d.py + dy / Math.max(1, sh), 0, 1);
+  mutate(() => styleObjs().forEach(o => { o.posX = +nx.toFixed(3); o.posY = +ny.toFixed(3); }), d.key, { panel: false });
+});
+function pvUp() { const d = pv.down; pv.down = null; if (!d) return; if (!d.moved) togglePlay(); else { if (curTab === 'style') renderTab(); toast(target === 'all' ? 'Moved all captions' : target === 'line' ? 'Moved this line' : 'Moved this line'); } }
+pc.addEventListener('pointerup', pvUp); pc.addEventListener('pointercancel', pvUp);
+$('#removeVid').onclick = async () => {
+  if (!P.video) return;
+  const choice = await modal({ title: 'Remove this video?', body: 'Keep the captions to attach a different video to them, or clear everything and start over. Your original file on the phone is not touched.', buttons: [{ label: 'Cancel', value: null }, { label: 'Keep captions', value: 'keep' }, { label: 'Clear everything', value: 'all', cls: 'danger' }] });
+  if (!choice) return;
+  pause(); const id = P.id;
+  try { await idbReq('videos', 'readwrite', s => s.delete(id)); } catch (e) { }
+  if (choice === 'all') { await deleteProject(id); startNewProject(); toast('Video and captions removed'); return; }
+  mutate(() => { P.video = null; }); videoFile = null; vid.removeAttribute('src'); vid.load(); audio16k = null; peaks = null; audioInfo = { state: 'none' };
+  sizePreview(); tlFit(); renderTab(); saveNow(); toast('Video removed — captions kept. Tap the upload icon to attach another.');
+};
 window.addEventListener('resize', () => { sizePreview(); tlSize(); });
 
 /* ---- Keyboard shortcuts ---- */
@@ -928,7 +950,7 @@ function renderTab() {
   tabBody.innerHTML = `<div class="tabpane">${f()}</div>`;
   bindTab(); tabBody.scrollTop = st;
   if (activeId) { const el = document.getElementById(activeId); if (el && el !== document.body) { el.focus({ preventScroll: true }); if (caret && 'selectionStart' in el) try { el.setSelectionRange(caret[0], caret[1]); } catch (e) { } } }
-  $('#emptyState').hidden = !!P.video; $('#guidesBtn').setAttribute('aria-pressed', P.layout.showGuides);
+  $('#emptyState').hidden = !!P.video; $('#removeVid').hidden = !P.video; $('#guidesBtn').setAttribute('aria-pressed', P.layout.showGuides);
 }
 
 /* ---- generic controls ---- */
@@ -1105,6 +1127,8 @@ function tabStyle() {
     <div class="row"><input id="presetName" class="input grow" placeholder="Name your style" maxlength="40"><button class="btn" data-act="savePreset">Save current as preset</button></div>
   </div>
   ${groups}
+  ${target === 'all' && P.captions.some(c => c.style && Object.keys(c.style).length) ? `<div class="card"><p class="note"><b>${P.captions.filter(c => c.style && Object.keys(c.style).length).length} line(s)</b> have their own style, so changes here don't reach them.</p><div class="row"><button class="btn" data-act="matchAll">Make every line follow these settings</button></div></div>` : ''}
+  <p class="note">Tip: drag the captions on the video to move them.</p>
   <div class="row"><button class="btn danger" data-act="resetStyle">${target === 'all' ? 'Reset all to original style' : target === 'line' ? 'Clear this line’s styling' : 'Clear styling on selected words'}</button></div>`;
 }
 function paletteHTML() {
@@ -1310,6 +1334,7 @@ const actions = {
     else mutate(() => styleObjs().forEach(o => Object.keys(o).forEach(k => delete o[k])));
     toast('Style reset');
   },
+  matchAll: () => { const n = P.captions.filter(c => c.style && Object.keys(c.style).length).length; mutate(() => P.captions.forEach(c => { delete c.style; })); toast(`${n} line(s) now follow the main style`); },
   resetAnim: () => { mutate(() => P.anim = clone(DEFAULT_ANIM)); toast('Animation reset'); },
   clearLineAnim: () => { const c = selCap(); mutate(() => delete c.anim); },
   addSwatch: () => { const v = normHex(effStyle()[ui.lastColorKey]); if (!v) return; const p = getPalette(); if (!p.includes(v)) { p.push(v); setPalette(p); renderTab(); toast(`Added ${v} to palette`); } },
