@@ -26,17 +26,17 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
-          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Captionsmith.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Cutline.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Captionsmith-apk
-          path: Captionsmith.apk
+          name: Cutline-apk
+          path: Cutline.apk
 
       - name: Publish as a download (Releases page)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Captionsmith build ${{ github.run_number }}
-          files: Captionsmith.apk
+          name: Cutline build ${{ github.run_number }}
+          files: Cutline.apk
           make_latest: true

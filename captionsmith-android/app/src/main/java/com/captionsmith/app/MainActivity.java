@@ -27,12 +27,12 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Captionsmith: the caption editor runs in a WebView from files bundled inside the app
+ * Cutline: the video editor and caption editor run in a WebView from files bundled inside the app
  * (served at https://appassets.androidplatform.net so the browser features it needs work).
  * Native parts: the file picker, saving exports to the phone, and keeping the screen on.
  */
 public class MainActivity extends Activity {
-    private static final String START = "https://appassets.androidplatform.net/assets/www/index.html";
+    private static final String START = "https://appassets.androidplatform.net/assets/www/editor.html";
     private static final int PICK_FILE = 42;
 
     private WebView web;
@@ -79,9 +79,11 @@ public class MainActivity extends Activity {
                 fileCallback = cb;
                 Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
                 pick.addCategory(Intent.CATEGORY_OPENABLE);
-                boolean wantsVideo = false;
-                for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("video")) wantsVideo = true;
-                pick.setType(wantsVideo ? "video/*" : "*/*");
+                boolean wantsVideo = false, wantsMixed = false;
+                for (String t : params.getAcceptTypes()) { if (t == null) continue; for (String one : t.split(",")) { one = one.trim(); if (one.startsWith("video")) wantsVideo = true; else if (one.startsWith("image") || one.startsWith("audio")) wantsMixed = true; } }
+                if (wantsVideo && wantsMixed) { pick.setType("*/*"); pick.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"video/*", "image/*", "audio/*"}); }
+                else pick.setType(wantsVideo ? "video/*" : "*/*");
+                if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 try {
                     startActivityForResult(Intent.createChooser(pick, wantsVideo ? "Choose a video" : "Choose a file"), PICK_FILE);
                 } catch (Exception e) {
@@ -92,7 +94,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        web.addJavascriptInterface(new Bridge(), "CaptionsmithAndroid");
+        web.addJavascriptInterface(new Bridge(), "CutlineAndroid");
 
         if (state != null) web.restoreState(state);
         if (web.getUrl() == null) web.loadUrl(START);
@@ -101,11 +103,25 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == PICK_FILE && fileCallback != null) {
-            fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            Uri[] picked = null;
+            if (resultCode == RESULT_OK && data != null && data.getClipData() != null) {
+                // several files chosen at once (Batch import)
+                android.content.ClipData clip = data.getClipData();
+                picked = new Uri[clip.getItemCount()];
+                for (int i = 0; i < picked.length; i++) picked[i] = clip.getItemAt(i).getUri();
+            } else picked = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+            fileCallback.onReceiveValue(picked);
             fileCallback = null;
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Back goes from Captions to Edit (and closes open sheets via the page) before leaving the app
+        if (web != null && web.canGoBack()) web.goBack();
+        else super.onBackPressed();
     }
 
     @Override
@@ -127,13 +143,13 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    /** Called from the web app as window.CaptionsmithAndroid */
+    /** Called from the web app as window.CutlineAndroid */
     private class Bridge {
         private final Map<String, OutputStream> outs = new HashMap<>();
         private final Map<String, Uri> uris = new HashMap<>();
         private final Map<String, String> names = new HashMap<>();
 
-        /** Start a file in Movies/Captionsmith (videos) or Download/Captionsmith (everything else). */
+        /** Start a file in Movies/Cutline (videos) or Download/Cutline (everything else). */
         @JavascriptInterface
         public String begin(String name, String mime) {
             try {
@@ -142,7 +158,7 @@ public class MainActivity extends Activity {
                 v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
                 v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
                 v.put(MediaStore.MediaColumns.RELATIVE_PATH,
-                        (video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS) + "/Captionsmith");
+                        (video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS) + "/Cutline");
                 v.put(MediaStore.MediaColumns.IS_PENDING, 1);
                 Uri collection = video
                         ? MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -153,7 +169,7 @@ public class MainActivity extends Activity {
                 String id = UUID.randomUUID().toString();
                 outs.put(id, r.openOutputStream(uri));
                 uris.put(id, uri);
-                names.put(id, (video ? "Movies" : "Download") + "/Captionsmith/" + name);
+                names.put(id, (video ? "Movies" : "Download") + "/Cutline/" + name);
                 return id;
             } catch (Exception e) {
                 return "";
