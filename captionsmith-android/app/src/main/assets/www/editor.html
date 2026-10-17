@@ -385,28 +385,56 @@ const GEN = {
 const genCanvas = {};
 function genFrame(m, t) { let c = genCanvas[m.gen]; if (!c) { c = genCanvas[m.gen] = document.createElement('canvas'); c.width = 540; c.height = 960; } const g = c.getContext('2d'); g.save(); GEN[m.gen](g, c.width, c.height, t); g.restore(); return c; }
 
-/* ============ Sound effects (synthesised, no downloads) ============ */
-const SR = 44100;
-function synth(dur, fn) { const n = Math.floor(dur * SR); const b = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: SR }); const d = b.getChannelData(0); let st = {}; for (let i = 0; i < n; i++) d[i] = fn(i / SR, i, st); let mx = 0; for (let i = 0; i < n; i++) mx = Math.max(mx, Math.abs(d[i])); if (mx > 0) for (let i = 0; i < n; i++) d[i] *= .89 / mx; return b; }
-function svf() { let lo = 0, bd = 0; return (x, f, q) => { const F = 2 * Math.sin(Math.PI * Math.min(f, SR / 6) / SR); lo += F * bd; const hi = x - lo - q * bd; bd += F * hi; return { lo, bd, hi }; }; }
-const rnd = () => Math.random() * 2 - 1;
+/* ============ Sound effects ============
+   Real recordings from Freesound, all released as CC0 (public domain). Trimmed, levelled and bundled in sfx/.
+   Sources are listed in sfx/CREDITS.txt. Ids stay the same as the old generated sounds, so older projects pick these up. */
 const SFX_DEF = {
-  whoosh: { name: 'Whoosh', d: .75, f: (() => { let s; return (t, i) => { if (!i) s = svf(); const p = t / .75, e = Math.pow(Math.sin(Math.PI * p), 2); return s(rnd(), 250 + 3200 * Math.pow(Math.sin(Math.PI * p), 1.6), .7).bd * e; }; })() },
-  swish: { name: 'Swish', d: .32, f: (() => { let s; return (t, i) => { if (!i) s = svf(); const p = t / .32; return s(rnd(), 1200 + 6000 * p, .5).bd * Math.sin(Math.PI * p) * (1 - p * .4); }; })() },
-  boom: { name: 'Cinematic boom', d: 2.4, f: (t, i, st) => { st.ph = (st.ph || 0) + 2 * Math.PI * (32 + 70 * Math.exp(-t * 3)) / SR; const e = Math.min(1, t * 200) * Math.exp(-t * 1.6); return Math.tanh(2.2 * (Math.sin(st.ph) * e + rnd() * .35 * Math.exp(-t * 14))); } },
-  hit: { name: 'Bass hit', d: .9, f: (t, i, st) => { st.ph = (st.ph || 0) + 2 * Math.PI * (45 + 120 * Math.exp(-t * 18)) / SR; return Math.tanh(3 * Math.sin(st.ph) * Math.exp(-t * 4.5) + rnd() * .5 * Math.exp(-t * 60)); } },
-  thud: { name: 'Vine thud', d: .55, f: (t, i, st) => { st.ph = (st.ph || 0) + 2 * Math.PI * (40 + 110 * Math.exp(-t * 12)) / SR; return Math.tanh(2.6 * Math.sin(st.ph) * Math.exp(-t * 7)); } },
-  riser: { name: 'Riser', d: 1.6, f: (() => { let s; return (t, i, st) => { if (!i) s = svf(); st.ph = (st.ph || 0) + 2 * Math.PI * (180 + 900 * Math.pow(t / 1.6, 2)) / SR; const e = Math.pow(t / 1.6, 1.8) * (t > 1.52 ? (1.6 - t) / .08 : 1); return (s(rnd(), 400 + 5000 * t / 1.6, .4).bd * .7 + Math.sin(st.ph) * .3) * e; }; })() },
-  pop: { name: 'Pop', d: .16, f: (t, i, st) => { st.ph = (st.ph || 0) + 2 * Math.PI * (300 + 900 * Math.exp(-t * 40)) / SR; return Math.sin(st.ph) * Math.exp(-t * 28); } },
-  click: { name: 'Keyboard', d: 1.4, f: (() => { let hits; return (t, i) => { if (!i) { hits = []; let x = .02; while (x < 1.35) { hits.push([x, .5 + Math.random() * .5]); x += .07 + Math.random() * .09; } } let v = 0; for (const [h, a] of hits) { const d = t - h; if (d >= 0 && d < .03) v += rnd() * a * Math.exp(-d * 260); } return v; }; })() },
-  glitch: { name: 'Glitch', d: .6, f: (t, i, st) => { const seg = Math.floor(t / .035); if (seg !== st.seg) { st.seg = seg; st.f = 80 + Math.random() * 1400; st.on = Math.random() > .25; st.ph = 0; } st.ph += st.f / SR; const sq = (st.ph % 1) < .5 ? 1 : -1; return st.on ? (sq * .6 + Math.round(rnd() * 3) / 3 * .4) : 0; } },
-  ding: { name: 'Correct', d: .9, f: t => { const n = (f, s) => t < s ? 0 : Math.sin(2 * Math.PI * f * (t - s)) * Math.exp(-(t - s) * 5); return n(1046.5, 0) + n(1318.5, .11) * .9 + n(1568, .22) * .8; } },
-  shutter: { name: 'Camera', d: .35, f: t => rnd() * (Math.exp(-t * 90) + .6 * Math.exp(-Math.max(0, t - .12) * 120) * (t > .12 ? 1 : 0)) },
-  cash: { name: 'Cash register', d: 1.3, f: t => { const ring = t < .18 ? 0 : (Math.sin(2 * Math.PI * 2093 * t) + .6 * Math.sin(2 * Math.PI * 2637 * t) + .3 * Math.sin(2 * Math.PI * 4186 * t)) * Math.exp(-(t - .18) * 3.5); const rattle = t < .16 ? rnd() * .6 * (Math.floor(t * 120) % 2) : 0; return ring * .6 + rattle; } }
+  whoosh: { name: 'Whoosh', cat: 'Transitions', file: 'whoosh', peak: 0.07 },
+  bigwhoosh: { name: 'Big whoosh', cat: 'Transitions', file: 'bigwhoosh', peak: 1.11 },
+  swish: { name: 'Swish', cat: 'Transitions', file: 'swish', peak: 0.07 },
+  swipe: { name: 'Swipe', cat: 'Transitions', file: 'swipe', peak: 0.07 },
+  boom: { name: 'Cinematic boom', cat: 'Impacts', file: 'boom', peak: 0.05 },
+  hit: { name: 'Bass hit', cat: 'Impacts', file: 'hit', peak: 0.05 },
+  subdrop: { name: 'Sub drop', cat: 'Impacts', file: 'subdrop' },
+  punch: { name: 'Punch', cat: 'Impacts', file: 'punch' },
+  thud: { name: 'Thud', cat: 'Impacts', file: 'thud' },
+  riser: { name: 'Riser', cat: 'Build-up', file: 'riser', peak: 1.89 },
+  tension: { name: 'Tension sting', cat: 'Build-up', file: 'tension' },
+  pop: { name: 'Pop', cat: 'Pops & UI', file: 'pop' },
+  popup: { name: 'Pop up', cat: 'Pops & UI', file: 'popup' },
+  click: { name: 'Click', cat: 'Pops & UI', file: 'click' },
+  typing: { name: 'Keyboard', cat: 'Pops & UI', file: 'typing' },
+  ding: { name: 'Ding', cat: 'Pops & UI', file: 'ding' },
+  bell: { name: 'Bell', cat: 'Pops & UI', file: 'bell' },
+  shutter: { name: 'Camera', cat: 'Pops & UI', file: 'shutter' },
+  correct: { name: 'Correct', cat: 'Reactions', file: 'correct' },
+  wrong: { name: 'Wrong', cat: 'Reactions', file: 'wrong' },
+  cash: { name: 'Cash register', cat: 'Reactions', file: 'cash' },
+  glitch: { name: 'Glitch', cat: 'Reactions', file: 'glitch' },
+  scratch: { name: 'Record scratch', cat: 'Reactions', file: 'scratch' },
+  laugh: { name: 'Crowd laugh', cat: 'Reactions', file: 'laugh' }
 };
-const SFX = {}; // name -> AudioBuffer (built lazily)
-function sfxBuf(k) { if (!SFX[k]) SFX[k] = synth(SFX_DEF[k].d, SFX_DEF[k].f); return SFX[k]; }
-function sfxPeaks(k) { const m = media['sfx:' + k] || (media['sfx:' + k] = { id: 'sfx:' + k, kind: 'sfx', name: SFX_DEF[k].name }); if (!m.buf) { m.buf = sfxBuf(k); m.dur = m.buf.duration; m.peaks = peaksOf(m.buf, 300); m.ready = true; } return m; }
+const SFX_CATS = ['Transitions', 'Impacts', 'Build-up', 'Pops & UI', 'Reactions'];
+const SFX = {}; // id -> AudioBuffer
+let sfxReady = null;
+function loadSfx() {
+  if (sfxReady) return sfxReady;
+  sfxReady = Promise.all(Object.entries(SFX_DEF).map(async ([k, d]) => {
+    try { const r = await fetch('sfx/' + d.file + '.ogg'); if (!r.ok) throw new Error(r.status); SFX[k] = await decoder().decodeAudioData(await r.arrayBuffer()); }
+    catch (e) { console.warn('Sound effect missing:', k, e); }
+  })).then(() => { Object.keys(SFX).forEach(k => { const m = media['sfx:' + k]; if (m) { delete media['sfx:' + k]; } }); tlDirty = true; });
+  return sfxReady;
+}
+/* start time so the loudest moment of sound k lands on time t */
+function sfxAt(k, t) { return Math.max(0, t - ((SFX_DEF[k] && SFX_DEF[k].peak) || 0)); }
+function silentBuf() { return new AudioBuffer({ length: 4410, numberOfChannels: 1, sampleRate: 44100 }); }
+function sfxBuf(k) { return SFX[k] || silentBuf(); }
+function sfxPeaks(k) {
+  let m = media['sfx:' + k];
+  if (!m) { const d = SFX_DEF[k] || { name: 'Sound' }; m = media['sfx:' + k] = { id: 'sfx:' + k, kind: 'sfx', name: d.name }; }
+  if (!m.buf && SFX[k]) { m.buf = SFX[k]; m.dur = m.buf.duration; m.peaks = peaksOf(m.buf, 300); m.ready = true; }
+  return m;
+}
 function audioMedia(id) { if (id && id.startsWith('sfx:')) return sfxPeaks(id.slice(4)); return media[id]; }
 
 /* ============ Render engine ============ */
@@ -1042,7 +1070,7 @@ function renderSheet() {
     }
     case 'audio': {
       title = 'Audio';
-      h = sec('Sound effects · tap to add at the playhead', `<div class="grid">${Object.entries(SFX_DEF).map(([id, s]) => `<button class="opt" data-pick="sfx" data-val="${id}">${ico('audio')}<span>${s.name}</span></button>`).join('')}</div>`) +
+      h = '<p class="note">Tap a sound to hear it and drop it at the playhead.</p>' + SFX_CATS.map(c => sec(c, `<div class="grid">${Object.entries(SFX_DEF).filter(([, d]) => d.cat === c).map(([id, d]) => `<button class="opt" data-pick="sfx" data-val="${id}">${ico('audio')}<span>${d.name}</span></button>`).join('')}</div>`)).join('') +
         sec('Music and voice', `<div class="row"><button class="btn primary small" data-do="music">${ico('add')}Add from phone</button></div>` + mediaTiles(['audio', 'video'], 'addAud'));
       break;
     }
@@ -1065,7 +1093,7 @@ async function sheetDo(a, el) {
   const it = selItem();
   switch (a) {
     case 'trAll': { const tr = sheetTarget(); mutate(() => P.main.forEach((c, i) => { if (i < P.main.length - 1) c.tr = { ...tr }; })); toast(`${TRANS_LIST.find(x => x[0] === tr.type)[1]} on every cut`); tlDirty = true; return; }
-    case 'trSfx': { const i = sheet.data.i ?? P.main.indexOf(it); const L = mainLayout(); const tr = P.main[i].tr || {}; const at = L[i + 1].start + trDur(i) / 2; const k = tr.type === 'flash' ? 'hit' : tr.type === 'glitch' ? 'glitch' : 'whoosh'; mutate(() => P.aud.push(newAud('sfx:' + k, Math.max(0, at - (k === 'whoosh' ? .35 : .02))))); toast(`Added ${SFX_DEF[k].name.toLowerCase()} at the cut`); return; }
+    case 'trSfx': { const i = sheet.data.i ?? P.main.indexOf(it); const L = mainLayout(); const tr = P.main[i].tr || {}; const at = L[i + 1].start + trDur(i) / 2; const k = tr.type === 'flash' ? 'hit' : tr.type === 'glitch' ? 'glitch' : 'whoosh'; mutate(() => P.aud.push(newAud('sfx:' + k, sfxAt(k, at)))); toast(`Added ${SFX_DEF[k].name.toLowerCase()} at the cut`); return; }
     case 'tstyle': { const s = TEXT_STYLES[el.dataset.val]; mutate(() => { const { name, ...rest } = s; Object.assign(it, rest); }); ensureFonts(); renderSheet(); return; }
     case 'music': $('#fileAudio').click(); return;
     case 'addAud': { const m = media[el.dataset.id]; if (!m) return; if (m.kind === 'video' && !m.buf) { toast('Reading the sound from that video…'); try { m.buf = await decodeAudio(m.blob); m.peaks = peaksOf(m.buf); } catch (e) { toast('That video has no readable sound track.', true); return; } } mutate(() => P.aud.push(Object.assign(newAud(m.id, clock.t), { dur: Math.min(m.dur, Math.max(1, duration() - clock.t) || m.dur), kind: 'music', vol: .35, fi: .5, fo: 1 }))); closeSheet(); return; }
@@ -1114,7 +1142,7 @@ $('#fileAudio').addEventListener('change', async e => {
 function addText() { const s = TEXT_STYLES.fact; const { name, ...rest } = s; const x = Object.assign({ id: uid(), text: 'Your fact goes here', start: clock.t, dur: 2.5, x: .5, intro: 'pop', outro: 'fade', introD: .3, outroD: .2 }, rest); mutate(() => P.text.push(x)); P.demo = false; sel = { track: 'text', id: x.id }; renderTools(); openSheet('text'); }
 const VFX_DUR = { flash: .4, punch: .5, zoomblur: .4, glitch: .7, strobe: .8 };
 function addVfx(type) { const v = { id: uid(), type, start: clock.t, dur: VFX_DUR[type] || 1.5, k: .6 }; mutate(() => P.vfx.push(v)); sel = { track: 'vfx', id: v.id }; tlDirty = true; renderTools(); openSheet('vfx'); if (!playing) markDirty(); }
-function addSfx(k) { audition(k); mutate(() => P.aud.push(newAud('sfx:' + k, clock.t))); toast(`${SFX_DEF[k].name} added at ${fmt(clock.t)}`); }
+function addSfx(k) { audition(k); mutate(() => P.aud.push(newAud('sfx:' + k, sfxAt(k, clock.t)))); toast(`${SFX_DEF[k].name} added at ${fmt(clock.t)}`); }
 function splitSel() {
   const it = selItem(); if (!it) return; const t = clock.t;
   if (sel.track === 'main') {
@@ -1156,7 +1184,7 @@ function applyFactTemplate() {
     const L = mainLayout(); let reveal = -1;
     if (o.flash && L.length > 1) { let best = 1e9; L.forEach((e, i) => { if (i < L.length - 1) { const d = Math.abs(L[i + 1].start - 8); if (d < best) { best = d; reveal = i; } } }); P.main[reveal].tr = { type: 'flash', d: .3 }; n.tr++; }
     if (o.punch) P.main.forEach((c, i) => { if (i < P.main.length - 1 && i !== reveal && i % 3 === 2) { c.tr = { type: 'zoomin', d: .25 }; n.tr++; } });
-    if (o.sounds) { const L2 = mainLayout(); P.aud = P.aud.filter(a => !a.auto); P.main.forEach((c, i) => { if (i >= P.main.length - 1 || c.tr.type === 'cut') return; const at = L2[i + 1].start + trDur(i) / 2; const k = c.tr.type === 'flash' ? 'hit' : 'whoosh'; const a = newAud('sfx:' + k, at - (k === 'whoosh' ? .38 : .02)); a.auto = true; P.aud.push(a); n.sfx++; }); }
+    if (o.sounds) { const L2 = mainLayout(); P.aud = P.aud.filter(a => !a.auto); P.main.forEach((c, i) => { if (i >= P.main.length - 1 || c.tr.type === 'cut') return; const at = L2[i + 1].start + trDur(i) / 2; const k = c.tr.type === 'flash' ? 'hit' : 'whoosh'; const a = newAud('sfx:' + k, sfxAt(k, at)); a.auto = true; P.aud.push(a); n.sfx++; }); }
     if (o.pops) P.ovl.forEach(x => { x.intro = 'pop'; x.introD = .3; x.outro = 'fade'; x.kb = x.kb && x.kb !== 'none' ? x.kb : 'in'; });
     if (o.captions) P.text.forEach(x => { const { name, y, ...rest } = TEXT_STYLES.fact; Object.assign(x, rest); });
   });
@@ -1199,7 +1227,7 @@ async function runAutomate() {
       });
       P.main = next;
     }
-    if (o.whoosh) P.text.forEach(x => { x.intro = 'left'; x.introD = .3; const at = Math.max(0, x.start - .32); if (!P.aud.some(a => a.m.startsWith('sfx:') && Math.abs(a.start - at) < .25)) { P.aud.push(newAud('sfx:whoosh', at)); wh++; } });
+    if (o.whoosh) P.text.forEach(x => { x.intro = 'left'; x.introD = .3; const at = sfxAt('whoosh', x.start + .12); if (!P.aud.some(a => a.m.startsWith('sfx:') && Math.abs(a.start - at) < .25)) { P.aud.push(newAud('sfx:whoosh', at)); wh++; } });
     if (o.balance) { const voice = P.main.some(c => media[c.m] && media[c.m].kind === 'video' && !media[c.m].noAudio && (c.vol ?? 1) > 0); P.aud.forEach(a => { if (a.kind === 'music') { a.vol = voice ? .22 : .6; a.fi = Math.max(a.fi || 0, .8); a.fo = Math.max(a.fo || 0, 1.2); } else if (a.kind === 'sfx') { a.vol = .75; a.fo = Math.max(a.fo || 0, .03); } bal++; }); P.main.forEach(c => { c.vol = 1; }); P.ovl.forEach(x => { if (x.vol == null) x.vol = 0; }); }
   });
   if (cuts) rep.push(`cut ${cuts} silence${cuts > 1 ? 's' : ''}`); if (wh) rep.push(`${wh} text whoosh${wh > 1 ? 'es' : ''}`); if (bal) rep.push(`balanced ${bal} audio layer${bal > 1 ? 's' : ''}`);
@@ -1338,7 +1366,7 @@ function loadExample() {
   const f = TEXT_STYLES.fact; const { name, ...fs } = f; const tx = (text, start, dur) => Object.assign({ id: uid(), text, start, dur, x: .5, intro: 'pop', outro: 'fade', introD: .25, outroD: .15 }, fs);
   P.text = [tx("Saturn's rings are mostly ice", .2, 2.8), tx('and they are slowly vanishing', 3.15, 2.6), tx('gone in 300 million years', 5.95, 3.3)];
   P.vfx = [{ id: uid(), type: 'punch', start: 2.95, dur: .5, k: .6 }, { id: uid(), type: 'sparkle', start: 6, dur: 3.3, k: .5 }, { id: uid(), type: 'vignette', start: 0, dur: 9.3, k: .45 }];
-  P.aud = [Object.assign(newAud('sfx:riser', 0), { vol: .4 }), Object.assign(newAud('sfx:whoosh', 2.67), {}), Object.assign(newAud('sfx:hit', 5.88), {}), Object.assign(newAud('sfx:ding', 8.4), { vol: .5 })];
+  { const L = mainLayout(), c1 = L[1].start + trDur(0) / 2, c2 = L[2].start + trDur(1) / 2; P.aud = [Object.assign(newAud('sfx:whoosh', sfxAt('whoosh', c1)), {}), Object.assign(newAud('sfx:hit', sfxAt('hit', c2)), {}), Object.assign(newAud('sfx:riser', sfxAt('riser', c2)), { vol: .45 }), Object.assign(newAud('sfx:ding', 8.2), { vol: .55 })]; }
   sel = null; hist.undo = []; hist.redo = []; $('#projName').value = P.name; afterChange(); $('#saveState').textContent = 'Example'; sizePreview(); fitTimeline(); renderTools(); ensureFonts(); seek(0);
 }
 
@@ -1362,7 +1390,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sav
 window.addEventListener('pagehide', () => saveNow());
 (async function boot() {
   renderTools(); sizePreview(); requestAnimationFrame(tick);
-  await idbOpen(); let last = null; try { last = localStorage.getItem('cl.last'); } catch (e) { }
+  await Promise.all([idbOpen(), loadSfx()]); let last = null; try { last = localStorage.getItem('cl.last'); } catch (e) { }
   const list = await listProjects();
   if (!(last && list.find(p => p.id === last) && await openProject(last, true))) loadExample();
   if (document.fonts) document.fonts.ready.then(markDirty);

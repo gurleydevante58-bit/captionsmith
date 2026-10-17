@@ -1,0 +1,29 @@
+Cutline sound effects
+All recordings come from Freesound (https://freesound.org) and were released under
+Creative Commons 0 (public domain) by their creators. They were trimmed, faded and
+volume-levelled for the app. Credit is not required, but here they are:
+
+whoosh      https://freesound.org/s/60013/   qubodup - Whoosh
+bigwhoosh   https://freesound.org/s/169867/  Halgrimm - swoosh
+swish       https://freesound.org/s/72191/   whip03.wav
+swipe       https://freesound.org/s/60007/   qubodup - Swipe Whoosh
+boom        https://freesound.org/s/201571/  Julien_Matthey - JM_FX_Boom 01a
+hit         https://freesound.org/s/512389/  Kievinay - Bass Impact
+subdrop     https://freesound.org/s/428073/  newagesoup - Sub Drop Smooth
+punch       https://freesound.org/s/348243/  newagesoup - PUNCH-BOXING-02
+thud        https://freesound.org/s/332668/  big thud2.wav
+riser       https://freesound.org/s/561207/  Riser
+tension     https://freesound.org/s/506295/  tension sting
+pop         https://freesound.org/s/202230/  Pop sound
+popup       https://freesound.org/s/19284/   cartoon poppyup appearances
+click       https://freesound.org/s/256455/  Mouse Click
+typing      https://freesound.org/s/447909/  Keyboard typing
+ding        https://freesound.org/s/235911/  Notification Sound
+bell        https://freesound.org/s/611113/  bell ding 1
+correct     https://freesound.org/s/528957/  Correct Answer / That's Right!
+wrong       https://freesound.org/s/648462/  Wrong Answer
+shutter     https://freesound.org/s/431588/  iPhone Camera Capture
+cash        https://freesound.org/s/209578/  Cash Register Purchase
+glitch      https://freesound.org/s/332711/  Glitch
+scratch     https://freesound.org/s/71853/   record_scratch
+laugh       https://freesound.org/s/138112/  snakebarney - Small Crowd Laughing
