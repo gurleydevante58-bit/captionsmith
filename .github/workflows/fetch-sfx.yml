@@ -1,0 +1,31 @@
+name: Fetch sound effects
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download CC0 previews from Freesound
+        run: |
+          mkdir -p sfx-candidates
+          while read -r cat id uid; do
+            [ -z "$id" ] && continue
+            url="https://cdn.freesound.org/previews/$((id/1000))/${id}_${uid}-hq.mp3"
+            curl -fsSL --retry 3 -A "Mozilla/5.0" -o "sfx-candidates/${cat}-${id}.mp3" "$url" || echo "FAILED $url"
+            sleep 1
+          done < tools/sfx-candidates.txt
+          ls -la sfx-candidates
+      - name: Commit to the sfx-candidates branch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout -B sfx-candidates
+          git add sfx-candidates
+          git commit -m "Sound effect candidates [skip ci]"
+          git push -f origin sfx-candidates
