@@ -129,6 +129,9 @@ input[type=color]{width:100%;height:36px;border:1px solid var(--line);border-rad
 .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px;flex-wrap:wrap}
 .seg button{flex:1;background:none;border:0;border-radius:7px;padding:7px 8px;font-size:13px;font-weight:600;color:var(--mute);white-space:nowrap}
 .seg button[aria-pressed="true"]{background:var(--raise2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.seg.chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex:none}
+.seg.chips::-webkit-scrollbar{display:none}
+.seg.chips button{flex:none;padding:7px 12px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tog{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:14px}
 .tog input{appearance:none;-webkit-appearance:none;width:42px;height:24px;border-radius:99px;background:var(--raise2);border:1px solid var(--line);position:relative;flex:none;margin:0}
@@ -389,32 +392,84 @@ function genFrame(m, t) { let c = genCanvas[m.gen]; if (!c) { c = genCanvas[m.ge
    Real recordings from Freesound, all released as CC0 (public domain). Trimmed, levelled and bundled in sfx/.
    Sources are listed in sfx/CREDITS.txt. Ids stay the same as the old generated sounds, so older projects pick these up. */
 const SFX_DEF = {
-  whoosh: { name: 'Whoosh', cat: 'Transitions', file: 'whoosh', peak: 0.07 },
-  bigwhoosh: { name: 'Big whoosh', cat: 'Transitions', file: 'bigwhoosh', peak: 1.11 },
-  swish: { name: 'Swish', cat: 'Transitions', file: 'swish', peak: 0.07 },
-  swipe: { name: 'Swipe', cat: 'Transitions', file: 'swipe', peak: 0.07 },
-  boom: { name: 'Cinematic boom', cat: 'Impacts', file: 'boom', peak: 0.05 },
-  hit: { name: 'Bass hit', cat: 'Impacts', file: 'hit', peak: 0.05 },
-  subdrop: { name: 'Sub drop', cat: 'Impacts', file: 'subdrop' },
-  punch: { name: 'Punch', cat: 'Impacts', file: 'punch' },
-  thud: { name: 'Thud', cat: 'Impacts', file: 'thud' },
-  riser: { name: 'Riser', cat: 'Build-up', file: 'riser', peak: 1.89 },
-  tension: { name: 'Tension sting', cat: 'Build-up', file: 'tension' },
-  pop: { name: 'Pop', cat: 'Pops & UI', file: 'pop' },
-  popup: { name: 'Pop up', cat: 'Pops & UI', file: 'popup' },
-  click: { name: 'Click', cat: 'Pops & UI', file: 'click' },
-  typing: { name: 'Keyboard', cat: 'Pops & UI', file: 'typing' },
-  ding: { name: 'Ding', cat: 'Pops & UI', file: 'ding' },
-  bell: { name: 'Bell', cat: 'Pops & UI', file: 'bell' },
-  shutter: { name: 'Camera', cat: 'Pops & UI', file: 'shutter' },
-  correct: { name: 'Correct', cat: 'Reactions', file: 'correct' },
-  wrong: { name: 'Wrong', cat: 'Reactions', file: 'wrong' },
-  cash: { name: 'Cash register', cat: 'Reactions', file: 'cash' },
-  glitch: { name: 'Glitch', cat: 'Reactions', file: 'glitch' },
-  scratch: { name: 'Record scratch', cat: 'Reactions', file: 'scratch' },
-  laugh: { name: 'Crowd laugh', cat: 'Reactions', file: 'laugh' }
+  whoosh: { name: 'Whoosh', cat: 'Transitions', file: 'whoosh', peak: 0.07, tags: 'swoosh' },
+  bigwhoosh: { name: 'Big whoosh', cat: 'Transitions', file: 'bigwhoosh', peak: 1.11, tags: 'swoosh' },
+  revwhoosh: { name: 'Reverse whoosh', cat: 'Transitions', file: 'revwhoosh', peak: 1.61, tags: 'suck in build' },
+  etherwhoosh: { name: 'Airy whoosh', cat: 'Transitions', file: 'etherwhoosh', peak: 0.83, tags: 'ethereal soft' },
+  swish: { name: 'Swish', cat: 'Transitions', file: 'swish', peak: 0.07, tags: 'whip' },
+  swipe: { name: 'Swipe', cat: 'Transitions', file: 'swipe', peak: 0.07, tags: 'whip' },
+  whooshboom: { name: 'Whoosh + boom', cat: 'Transitions', file: 'whooshboom', peak: 0.29, tags: 'impact' },
+  swooshblast: { name: 'Swoosh blast', cat: 'Transitions', file: 'swooshblast', peak: 0.49, tags: 'explosion impact' },
+  camerazoom: { name: 'Camera zoom', cat: 'Transitions', file: 'camerazoom', peak: 0.23, tags: 'lens' },
+  boom: { name: 'Cinematic boom', cat: 'Impacts', file: 'boom', peak: 0.05, tags: 'trailer bass' },
+  hit: { name: 'Bass hit', cat: 'Impacts', file: 'hit', peak: 0.05, tags: 'impact drop' },
+  subdrop: { name: 'Sub drop', cat: 'Impacts', file: 'subdrop', tags: 'bass' },
+  punch: { name: 'Punch', cat: 'Impacts', file: 'punch', tags: 'fight hit' },
+  thud: { name: 'Thud', cat: 'Impacts', file: 'thud', tags: 'fall vine boom' },
+  explosion: { name: 'Explosion', cat: 'Impacts', file: 'explosion', peak: 0.49, tags: 'blast bomb' },
+  thunder: { name: 'Thunder', cat: 'Impacts', file: 'thunder', peak: 0.75, tags: 'storm' },
+  clang: { name: 'Metal clang', cat: 'Impacts', file: 'clang', tags: 'pan hit' },
+  glass: { name: 'Glass break', cat: 'Impacts', file: 'glass', tags: 'smash shatter' },
+  riser: { name: 'Riser', cat: 'Build-up', file: 'riser', peak: 1.89, tags: 'build' },
+  darkriser: { name: 'Dark riser', cat: 'Build-up', file: 'darkriser', peak: 3.65, tags: 'horror build' },
+  tension: { name: 'Tension sting', cat: 'Build-up', file: 'tension', tags: 'suspense horror' },
+  drumroll: { name: 'Drum roll', cat: 'Build-up', file: 'drumroll', tags: 'reveal' },
+  heartbeat: { name: 'Heartbeat', cat: 'Build-up', file: 'heartbeat', tags: 'suspense' },
+  tick: { name: 'Clock tick', cat: 'Build-up', file: 'tick', tags: 'time' },
+  countdown: { name: 'Countdown beeps', cat: 'Build-up', file: 'countdown', tags: 'timer bomb' },
+  correct: { name: 'Correct', cat: 'Reactions', file: 'correct', tags: 'right win' },
+  wrong: { name: 'Wrong', cat: 'Reactions', file: 'wrong', tags: 'buzzer fail' },
+  tada: { name: 'Ta-da', cat: 'Reactions', file: 'tada', tags: 'fanfare reveal' },
+  rimshot: { name: 'Rimshot', cat: 'Reactions', file: 'rimshot', tags: 'ba dum tss joke' },
+  laugh: { name: 'Crowd laugh', cat: 'Reactions', file: 'laugh', tags: 'sitcom' },
+  awkward: { name: 'Awkward laugh', cat: 'Reactions', file: 'awkward', tags: 'crowd' },
+  gasp: { name: 'Gasp', cat: 'Reactions', file: 'gasp', tags: 'shock' },
+  wow: { name: 'Crowd wow', cat: 'Reactions', file: 'wow', tags: 'ooh amazed' },
+  applause: { name: 'Applause', cat: 'Reactions', file: 'applause', tags: 'clap' },
+  cheer: { name: 'Cheer', cat: 'Reactions', file: 'cheer', tags: 'crowd yay' },
+  crickets: { name: 'Crickets', cat: 'Reactions', file: 'crickets', tags: 'awkward silence' },
+  airhorn: { name: 'Air horn', cat: 'Reactions', file: 'airhorn', tags: 'mlg' },
+  sadtrombone: { name: 'Sad trombone', cat: 'Reactions', file: 'sadtrombone', tags: 'fail wah' },
+  cash: { name: 'Cash register', cat: 'Reactions', file: 'cash', tags: 'money cha ching' },
+  scratch: { name: 'Record scratch', cat: 'Reactions', file: 'scratch', tags: 'stop rewind' },
+  boing: { name: 'Boing', cat: 'Comedy', file: 'boing', tags: 'spring bounce' },
+  slidewhistle: { name: 'Slide whistle', cat: 'Comedy', file: 'slidewhistle', tags: 'fall cartoon' },
+  honk: { name: 'Clown horn', cat: 'Comedy', file: 'honk', tags: 'honk' },
+  squeak: { name: 'Squeaky toy', cat: 'Comedy', file: 'squeak' },
+  bonk: { name: 'Bonk', cat: 'Comedy', file: 'bonk', tags: 'hit head' },
+  kiss: { name: 'Kiss', cat: 'Comedy', file: 'kiss', tags: 'smooch' },
+  magic: { name: 'Magic sparkle', cat: 'Comedy', file: 'magic', tags: 'shine twinkle' },
+  pop: { name: 'Pop', cat: 'Comedy', file: 'pop' },
+  popup: { name: 'Pop up', cat: 'Comedy', file: 'popup', tags: 'appear' },
+  plop: { name: 'Plop', cat: 'Comedy', file: 'plop', tags: 'drop' },
+  glitch: { name: 'Glitch', cat: 'Comedy', file: 'glitch', tags: 'error static' },
+  coin8bit: { name: '8-bit coin', cat: 'Game', file: 'coin8bit', tags: 'retro pickup' },
+  coin: { name: 'Coin drop', cat: 'Game', file: 'coin', tags: 'money' },
+  powerup: { name: 'Power up', cat: 'Game', file: 'powerup', tags: 'retro' },
+  levelup: { name: 'Level up', cat: 'Game', file: 'levelup', tags: 'win' },
+  gameover: { name: 'Game over', cat: 'Game', file: 'gameover', tags: 'lose' },
+  laser: { name: 'Laser', cat: 'Game', file: 'laser', tags: 'sci-fi zap' },
+  click: { name: 'Click', cat: 'UI & Tech', file: 'click', tags: 'mouse tap' },
+  typing: { name: 'Keyboard', cat: 'UI & Tech', file: 'typing', tags: 'typing' },
+  ding: { name: 'Ding', cat: 'UI & Tech', file: 'ding', tags: 'notification' },
+  bell: { name: 'Bell', cat: 'UI & Tech', file: 'bell', tags: 'ring' },
+  textmsg: { name: 'Message', cat: 'UI & Tech', file: 'textmsg', tags: 'text notification' },
+  buzz: { name: 'Phone buzz', cat: 'UI & Tech', file: 'buzz', tags: 'vibrate' },
+  vibrate: { name: 'Vibrate', cat: 'UI & Tech', file: 'vibrate', tags: 'phone' },
+  shutter: { name: 'Camera', cat: 'UI & Tech', file: 'shutter', tags: 'photo shutter' },
+  bleep: { name: 'Censor bleep', cat: 'UI & Tech', file: 'bleep', tags: 'beep swear' },
+  error: { name: 'Error', cat: 'UI & Tech', file: 'error', tags: 'beep' },
+  alarm: { name: 'Alarm clock', cat: 'UI & Tech', file: 'alarm', tags: 'ring wake' },
+  siren: { name: 'Police siren', cat: 'World', file: 'siren', tags: 'cops' },
+  knock: { name: 'Door knock', cat: 'World', file: 'knock' },
+  footsteps: { name: 'Running', cat: 'World', file: 'footsteps', tags: 'footsteps' },
+  pageturn: { name: 'Page turn', cat: 'World', file: 'pageturn', tags: 'book paper' },
+  splash: { name: 'Splash', cat: 'World', file: 'splash', tags: 'water' },
+  drop: { name: 'Water drop', cat: 'World', file: 'drop', tags: 'drip' },
+  spray: { name: 'Spray', cat: 'World', file: 'spray', tags: 'aerosol' },
+  zipper: { name: 'Zipper', cat: 'World', file: 'zipper' }
 };
-const SFX_CATS = ['Transitions', 'Impacts', 'Build-up', 'Pops & UI', 'Reactions'];
+const SFX_CATS = ['Transitions', 'Impacts', 'Build-up', 'Reactions', 'Comedy', 'Game', 'UI & Tech', 'World'];
 const SFX = {}; // id -> AudioBuffer
 let sfxReady = null;
 function loadSfx() {
@@ -963,7 +1018,7 @@ function setVal(k, v, rerender) {
 $('#sheetBody').addEventListener('input', e => { const el = e.target.closest('[data-k]'); if (!el) return; setVal(el.dataset.k, coerce(el, el.value)); });
 $('#sheetBody').addEventListener('change', e => { const el = e.target.closest('[data-k]'); if (el && el.type === 'checkbox') renderSheetSoon(); });
 $('#sheetBody').addEventListener('click', e => {
-  const sb = e.target.closest('[data-seg] button'); if (sb) { const k = sb.parentElement.dataset.seg; setVal(k, coerce(sb, sb.dataset.val), true); return; }
+  const sb = e.target.closest('[data-seg] button'); if (sb) { const k = sb.parentElement.dataset.seg; setVal(k, coerce(sb, sb.dataset.val), !k.startsWith('@')); return; }
   const pk = e.target.closest('[data-pick]'); if (pk) { pickOption(pk.dataset.pick, pk.dataset.val); return; }
   const ac = e.target.closest('[data-do]'); if (ac) sheetDo(ac.dataset.do, ac);
 });
@@ -1069,9 +1124,13 @@ function renderSheet() {
       break;
     }
     case 'audio': {
-      title = 'Audio';
-      h = '<p class="note">Tap a sound to hear it and drop it at the playhead.</p>' + SFX_CATS.map(c => sec(c, `<div class="grid">${Object.entries(SFX_DEF).filter(([, d]) => d.cat === c).map(([id, d]) => `<button class="opt" data-pick="sfx" data-val="${id}">${ico('audio')}<span>${d.name}</span></button>`).join('')}</div>`)).join('') +
+      title = 'Audio'; const cat = sheet.data.sfxCat || 'Transitions';
+      h = `<input class="input" type="search" id="sfxQ" data-k="@q" data-num="no" placeholder="Search ${Object.keys(SFX_DEF).length} sounds" aria-label="Search sounds" value="${esc(sheet.data.q || '')}">` +
+        `<div class="seg chips" data-seg="@sfxcat">${SFX_CATS.map(c => `<button data-val="${esc(c)}" aria-pressed="${c === cat}">${c}</button>`).join('')}</div>` +
+        `<div class="grid" id="sfxGrid">${Object.entries(SFX_DEF).map(([id, d]) => `<button class="opt" data-pick="sfx" data-val="${id}" data-cat="${esc(d.cat)}" data-name="${esc((d.name + ' ' + (d.tags || '') + ' ' + d.cat).toLowerCase())}">${ico('audio')}<span>${d.name}</span></button>`).join('')}</div>` +
+        `<p class="note" id="sfxNone" hidden>No sounds match. Try another word.</p><p class="note">Tap a sound to hear it and drop it at the playhead.</p>` +
         sec('Music and voice', `<div class="row"><button class="btn primary small" data-do="music">${ico('add')}Add from phone</button></div>` + mediaTiles(['audio', 'video'], 'addAud'));
+      setTimeout(filterSfx);
       break;
     }
     case 'add': title = sheet.data.track === 'ovl' ? 'Add an overlay' : 'Add to the video track'; h = `<div class="row"><button class="btn primary" data-do="pick">${ico('add')}Choose from phone</button></div>` + mediaTiles(['video', 'image', 'gen'], 'useMedia') + (sheet.data.track === 'ovl' ? '<p class="note">PNG cut-outs with transparent backgrounds work best for pop-ins. Photos look good with the Photo card look.</p>' : ''); break;
@@ -1088,7 +1147,13 @@ function mediaTiles(kinds, act) {
   const list = P.media.filter(m => kinds.includes(m.kind) && media[m.id] && media[m.id].ready); if (!list.length) return '';
   return `<div class="medialist">${list.map(mm => { const m = media[mm.id]; const th = m.thumbs && m.thumbs[0]; return `<button class="mtile" data-do="${act}" data-id="${m.id}"><span class="th" style="${th ? `background-image:url(${th})` : ''}"></span>${m.dur ? `<span class="du">${fmt(m.dur)}</span>` : ''}<span class="mm">${esc(m.name)}</span></button>`; }).join('')}</div>`;
 }
-function sheetHook(k, v) { if (k === 'cat') { sheet.data.cat = v; renderSheet(); } else if (k.startsWith('opt:')) { (sheet.data.opts || (sheet.data.opts = {}))[k.slice(4)] = v; } }
+function filterSfx() {
+  const g = $('#sfxGrid'); if (!g || !sheet) return; const q = (sheet.data.q || '').trim().toLowerCase(), cat = sheet.data.sfxCat || 'Transitions'; let shown = 0;
+  $$('.opt', g).forEach(b => { const on = q ? q.split(/\s+/).every(w => b.dataset.name.includes(w)) : b.dataset.cat === cat; b.hidden = !on; if (on) shown++; });
+  $$('[data-seg="@sfxcat"] button', $('#sheetBody')).forEach(b => b.setAttribute('aria-pressed', !q && b.dataset.val === cat));
+  const none = $('#sfxNone'); if (none) none.hidden = shown > 0;
+}
+function sheetHook(k, v) { if (k === 'cat') { sheet.data.cat = v; renderSheet(); } else if (k === 'sfxcat') { sheet.data.sfxCat = v; sheet.data.q = ''; const q = $('#sfxQ'); if (q) q.value = ''; filterSfx(); } else if (k === 'q') { sheet.data.q = v; filterSfx(); } else if (k.startsWith('opt:')) { (sheet.data.opts || (sheet.data.opts = {}))[k.slice(4)] = v; } }
 async function sheetDo(a, el) {
   const it = selItem();
   switch (a) {

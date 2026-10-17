@@ -27,3 +27,56 @@ cash        https://freesound.org/s/209578/  Cash Register Purchase
 glitch      https://freesound.org/s/332711/  Glitch
 scratch     https://freesound.org/s/71853/   record_scratch
 laugh       https://freesound.org/s/138112/  snakebarney - Small Crowd Laughing
+
+revwhoosh   https://freesound.org/s/181889/
+etherwhoosh https://freesound.org/s/462089/
+whooshboom  https://freesound.org/s/118934/
+swooshblast https://freesound.org/s/234555/
+camerazoom  https://freesound.org/s/371882/
+explosion   https://freesound.org/s/235968/
+thunder     https://freesound.org/s/436790/
+clang       https://freesound.org/s/209771/
+glass       https://freesound.org/s/212698/
+darkriser   https://freesound.org/s/683667/
+drumroll    https://freesound.org/s/191718/
+heartbeat   https://freesound.org/s/22416/
+tick        https://freesound.org/s/188033/
+countdown   https://freesound.org/s/398238/
+gasp        https://freesound.org/s/341908/
+wow         https://freesound.org/s/870654/
+awkward     https://freesound.org/s/346682/
+applause    https://freesound.org/s/277022/
+cheer       https://freesound.org/s/182571/
+crickets    https://freesound.org/s/543965/
+airhorn     https://freesound.org/s/414208/
+tada        https://freesound.org/s/256128/
+rimshot     https://freesound.org/s/132418/
+sadtrombone https://freesound.org/s/175409/
+boing       https://freesound.org/s/61847/
+slidewhistlehttps://freesound.org/s/395443/
+honk        https://freesound.org/s/251611/
+squeak      https://freesound.org/s/468443/
+bonk        https://freesound.org/s/466202/
+kiss        https://freesound.org/s/536335/
+magic       https://freesound.org/s/562292/
+plop        https://freesound.org/s/447910/
+coin8bit    https://freesound.org/s/253172/
+coin        https://freesound.org/s/17502/
+powerup     https://freesound.org/s/220173/
+levelup     https://freesound.org/s/442943/
+gameover    https://freesound.org/s/159408/
+laser       https://freesound.org/s/30935/
+bleep       https://freesound.org/s/213795/
+error       https://freesound.org/s/242503/
+textmsg     https://freesound.org/s/242855/
+buzz        https://freesound.org/s/476836/
+vibrate     https://freesound.org/s/515295/
+alarm       https://freesound.org/s/14262/
+siren       https://freesound.org/s/70938/
+pageturn    https://freesound.org/s/397548/
+knock       https://freesound.org/s/268500/
+footsteps   https://freesound.org/s/443218/
+splash      https://freesound.org/s/442773/
+drop        https://freesound.org/s/174718/
+spray       https://freesound.org/s/267709/
+zipper      https://freesound.org/s/51176/
