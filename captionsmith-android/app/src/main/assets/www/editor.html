@@ -777,8 +777,9 @@ function active(it, t) { return t >= it.start && t < it.start + it.dur; }
 function renderFrame(g, W, H, t) {
   frameNo++;
   renderMain(g, W, H, t);
-  for (const o of P.ovl) if (active(o, t)) drawOverlay(g, W, H, o, t);
+  for (const o of P.ovl) if (!o.aboveFx && active(o, t)) drawOverlay(g, W, H, o, t);
   for (const v of P.vfx) if (active(v, t) && VFX[v.type]) { g.save(); VFX[v.type].fn(g, W, H, v.k ?? .6, t - v.start, v.dur, t); g.restore(); }
+  for (const o of P.ovl) if (o.aboveFx && active(o, t)) drawOverlay(g, W, H, o, t);
   for (const x of P.text) if (active(x, t)) drawText(g, W, H, x, t);
 }
 
@@ -1164,7 +1165,8 @@ function renderSheet() {
       break;
     case 'look': {
       title = 'Look'; const m = media[it.m];
-      h = sec('Frame', F.seg('look', [['none', 'Plain'], ['shadow', 'Shadow'], ['card', 'Photo card']], it.look || 'none')) + F.range('Size', 'scale', it.scale, .05, 2, .01, '%') + F.range('Rotate', 'rot', it.rot || 0, -180, 180, 1, '°') + F.range('Opacity', 'opacity', it.opacity ?? 1, 0, 1, .02, '%') +
+      h = sec('Layer', F.seg('aboveFx', [[false, 'Under effects'], [true, 'Above effects']], !!it.aboveFx) + '<p class="note">Above effects keeps this overlay sharp and clean when a Blur, Glitch, Shake or other effect is on.</p>') +
+        sec('Frame', F.seg('look', [['none', 'Plain'], ['shadow', 'Shadow'], ['card', 'Photo card']], it.look || 'none')) + F.range('Size', 'scale', it.scale, .05, 2, .01, '%') + F.range('Rotate', 'rot', it.rot || 0, -180, 180, 1, '°') + F.range('Opacity', 'opacity', it.opacity ?? 1, 0, 1, .02, '%') +
         (m && m.kind === 'video' ? F.range('Volume', 'vol', it.vol ?? 0, 0, 2, .05, '%') : '') + '<p class="note">Drag it on the preview to move it; pinch with two fingers to resize and rotate.</p>'; break;
     }
     case 'text': {
@@ -1182,7 +1184,7 @@ function renderSheet() {
       title = k === 'vfx' ? 'Effect' : 'Add an effect at the playhead';
       h = F.seg('@cat', VFX_CATS.map(c => [c, c]), cat) + F.grid('type', Object.entries(VFX).filter(([, v]) => v.cat === cat).map(([id, v]) => [id, v.name]), k === 'vfx' ? it.type : '', 'vfx');
       if (k === 'vfx') h += F.range('Intensity', 'k', it.k ?? .6, 0, 1, .02, '%') + '<p class="note">Drag the effect bar\'s ends on the timeline to set how long it lasts.</p>';
-      else h += '<p class="note">Effects apply to the video and overlays underneath them. Text stays crisp on top.</p>';
+      else h += '<p class="note">Effects apply to the video and overlays underneath them. Text stays crisp on top. To keep an overlay sharp, select it and set Look → Layer → Above effects.</p>';
       break;
     }
     case 'audio': {
