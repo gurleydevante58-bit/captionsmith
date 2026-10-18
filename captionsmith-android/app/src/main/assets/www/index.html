@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#15181e">
+<meta name="theme-color" content="#111626">
 <style>html,body{margin:0}</style>
 </head>
 <body>
@@ -22,9 +22,9 @@
 <style>
 /* Layout: phone-first editor. Stage (preview + transport + timeline) pinned on top, tabbed tool panel scrolls below; side-by-side from 900px. Deliberately single dark theme, like most video tools. */
 :root{
-  --bg:#0e1014; --panel:#15181e; --raise:#1d2129; --raise2:#262b35; --line:#2e3440;
-  --fg:#e8eaee; --mute:#8d95a5; --dim:#5d6575;
-  --accent:#ffc531; --accent-ink:#1b1500; --accent-soft:rgba(255,197,49,.14);
+  --bg:#0a0d16; --panel:#111626; --raise:#18203a; --raise2:#212b4a; --line:#2a3558;
+  --fg:#eef2ff; --mute:#8e9bc4; --dim:#5b6791;
+  --accent:#5b8cff; --accent-ink:#ffffff; --accent-soft:rgba(91,140,255,.16);
   --danger:#ff6b5e; --ok:#4fd18b; --info:#6fb6ff;
   --ui:"Familjen Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -190,7 +190,7 @@ table.keys td:first-child{white-space:nowrap;width:1%;padding-right:14px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 #vid{position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none}
 .hide-phone{display:none}
-#guidesBtn[aria-pressed="true"]{color:var(--accent);border-color:rgba(255,197,49,.5)}
+#guidesBtn[aria-pressed="true"]{color:var(--accent);border-color:rgba(91,140,255,.55)}
 @media (max-width:560px){
   .brand .bt{display:none}
   .savestate{font-size:11px;max-width:84px;overflow:hidden;text-overflow:ellipsis}
@@ -211,7 +211,7 @@ table.keys td:first-child{white-space:nowrap;width:1%;padding-right:14px}
 
 <div id="app">
   <header class="topbar">
-    <nav class="modes" aria-label="Screens"><a href="editor.html">Edit</a><a aria-current="page">Captions</a></nav>
+    <nav class="modes" aria-label="Screens"><a href="editor.html#edit">Edit</a><a aria-current="page">Captions</a></nav>
     <input id="projName" aria-label="Project name" value="Untitled project">
     <span class="savestate" id="saveState">Not saved yet</span>
     <button class="iconbtn" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
@@ -591,7 +591,7 @@ function drawGuides(ctx, W, H, L) {
   const sa = safeBox(W, H, L); ctx.save();
   ctx.fillStyle = 'rgba(255,90,80,.10)';
   ctx.fillRect(0, 0, W, sa.y0); ctx.fillRect(0, sa.y1, W, H - sa.y1); ctx.fillRect(0, sa.y0, sa.x0, sa.y1 - sa.y0); ctx.fillRect(sa.x1, sa.y0, W - sa.x1, sa.y1 - sa.y0);
-  ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(255,197,49,.7)'; ctx.lineWidth = Math.max(1, W / 500); ctx.strokeRect(sa.x0, sa.y0, sa.x1 - sa.x0, sa.y1 - sa.y0); ctx.restore();
+  ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(91,140,255,.75)'; ctx.lineWidth = Math.max(1, W / 500); ctx.strokeRect(sa.x0, sa.y0, sa.x1 - sa.x0, sa.y1 - sa.y0); ctx.restore();
 }
 
 /* Output frame geometry */
@@ -698,7 +698,7 @@ function drawPreview() {
     if (compareSplit) {
       pctx.save(); pctx.beginPath(); pctx.rect(0, 0, W / 2, H); pctx.clip(); drawCaptions(pctx, W, H, t, P); pctx.restore();
       pctx.save(); pctx.beginPath(); pctx.rect(W / 2, 0, W / 2, H); pctx.clip(); drawCaptions(pctx, W, H, t, pending.proj); pctx.restore();
-      pctx.fillStyle = 'rgba(255,197,49,.9)'; pctx.fillRect(W / 2 - 1, 0, 2, H);
+      pctx.fillStyle = 'rgba(91,140,255,.95)'; pctx.fillRect(W / 2 - 1, 0, 2, H);
       pctx.font = `600 ${Math.round(H / 34)}px ${getComputedStyle(document.body).fontFamily}`; pctx.textBaseline = 'bottom';
       pctx.fillStyle = 'rgba(0,0,0,.6)'; const fy = H - 10; pctx.textAlign = 'left'; pctx.fillText(' Now ', 10, fy); pctx.textAlign = 'right'; pctx.fillText(' New ', W - 10, fy);
       pctx.fillStyle = '#fff'; pctx.textAlign = 'left'; pctx.fillText(' Now ', 10, fy - 1); pctx.textAlign = 'right'; pctx.fillText(' New ', W - 10, fy - 1);
@@ -736,7 +736,7 @@ function tlZoom(k) { const t = curTime(); const xp = (t - tl.start) * tl.pps; tl
 const tx = t => (t - tl.start) * tl.pps, tt = x => tl.start + x / tl.pps;
 function drawTimeline() {
   const dpr = window.devicePixelRatio || 1, c = tctx, W = tl.w, H = tl.h; c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  c.fillStyle = '#15181e'; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#111626'; c.fillRect(0, 0, W, H);
   const dur = duration(), t = curTime();
   if (isPlaying() && !tl.drag) { const x = tx(t); if (x > W - 24 || x < 0) tl.start = clamp(t - (W * .15) / tl.pps, 0, Math.max(0, dur - W * .9 / tl.pps)); }
   // ruler
@@ -744,7 +744,7 @@ function drawTimeline() {
   c.font = '10px ' + getComputedStyle(document.body).getPropertyValue('--mono'); c.fillStyle = '#5d6575'; c.strokeStyle = '#2e3440'; c.lineWidth = 1; c.textBaseline = 'top';
   for (let s = Math.floor(tl.start / step) * step; s <= tt(W); s += step) { const x = Math.round(tx(s)) + .5; if (x < 0) continue; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, TL.ruler - 4); c.stroke(); c.fillText(step < 1 ? s.toFixed(1) + 's' : fmtT(s).replace(/\.\d+$/, ''), x + 3, 2); }
   // end of media
-  const xe = tx(dur); if (xe < W) { c.fillStyle = '#0e1014'; c.fillRect(xe, TL.ruler, W - xe, H - TL.ruler); }
+  const xe = tx(dur); if (xe < W) { c.fillStyle = '#0a0d16'; c.fillRect(xe, TL.ruler, W - xe, H - TL.ruler); }
   // waveform
   const mid = TL.waveY + TL.waveH / 2;
   if (peaks) {
@@ -757,12 +757,12 @@ function drawTimeline() {
   P.captions.forEach(cap => {
     const x0 = tx(cap.start), x1 = tx(cap.end); if (x1 < 0 || x0 > W) return;
     const isSel = sc && cap.id === sc.id; const w = Math.max(2, x1 - x0);
-    c.fillStyle = isSel ? 'rgba(255,197,49,.22)' : '#262b35'; rrect(c, x0 + .5, TL.capY, w - 1, TL.capH, 5); c.fill();
-    c.strokeStyle = isSel ? '#ffc531' : '#3a4150'; c.lineWidth = isSel ? 1.5 : 1; c.stroke();
+    c.fillStyle = isSel ? 'rgba(91,140,255,.24)' : '#212b4a'; rrect(c, x0 + .5, TL.capY, w - 1, TL.capH, 5); c.fill();
+    c.strokeStyle = isSel ? '#5b8cff' : '#33406a'; c.lineWidth = isSel ? 1.5 : 1; c.stroke();
     if (w > 18) { c.save(); c.beginPath(); c.rect(x0 + 4, TL.capY, w - 8, TL.capH); c.clip(); c.fillStyle = isSel ? '#fff' : '#c8ccd4'; c.fillText(capText(cap), x0 + 6, TL.capY + 13); c.restore(); }
     if (isSel) {
-      c.fillStyle = '#ffc531'; c.fillRect(x0, TL.capY + 8, 3, TL.capH - 16); c.fillRect(x1 - 3, TL.capY + 8, 3, TL.capH - 16);
-      cap.words.forEach((wd, i) => { const xw = tx(wd.start); if (i > 0) { c.fillStyle = '#ffc531'; c.fillRect(xw - .5, TL.capY + 24, 1, TL.capH - 26); c.beginPath(); c.arc(xw, TL.capY + TL.capH - 6, 3.5, 0, 7); c.fill(); } if (sel.words.has(i)) { c.fillStyle = 'rgba(255,197,49,.35)'; c.fillRect(xw, TL.capY + 24, tx(wd.end) - xw, 6); } });
+      c.fillStyle = '#5b8cff'; c.fillRect(x0, TL.capY + 8, 3, TL.capH - 16); c.fillRect(x1 - 3, TL.capY + 8, 3, TL.capH - 16);
+      cap.words.forEach((wd, i) => { const xw = tx(wd.start); if (i > 0) { c.fillStyle = '#5b8cff'; c.fillRect(xw - .5, TL.capY + 24, 1, TL.capH - 26); c.beginPath(); c.arc(xw, TL.capY + TL.capH - 6, 3.5, 0, 7); c.fill(); } if (sel.words.has(i)) { c.fillStyle = 'rgba(255,197,49,.35)'; c.fillRect(xw, TL.capY + 24, tx(wd.end) - xw, 6); } });
     } else if (w > 40) { c.fillStyle = '#4a5262'; cap.words.forEach((wd, i) => { if (i) c.fillRect(tx(wd.start), TL.capY + TL.capH - 9, 1, 6); }); }
   });
   // playhead

@@ -4,8 +4,9 @@
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:statusBarColor">@color/bar</item>
         <item name="android:navigationBarColor">@color/bg</item>
-        <item name="android:colorAccent">#FFC531</item>
+        <item name="android:colorAccent">#5B8CFF</item>
     </style>
-    <color name="bg">#0E1014</color>
-    <color name="bar">#15181E</color>
+    <color name="bg">#0A0D16</color>
+    <color name="bar">#111626</color>
+    <color name="ic_launcher_background">#0E1014</color>
 </resources>
