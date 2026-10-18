@@ -138,6 +138,19 @@ input[type=color]{width:100%;height:36px;border:1px solid var(--line);border-rad
 .tog input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--mute);transition:transform .15s}
 .tog input:checked{background:var(--accent);border-color:var(--accent)}
 .tog input:checked::after{transform:translateX(18px);background:var(--accent-ink)}
+.sfxgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.sfxt{position:relative;display:flex;align-items:stretch;background:var(--raise);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:0}
+.sfxt .pv{flex:1;min-width:0;background:none;border:0;padding:8px 6px 7px 10px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:4px 6px;text-align:left;position:relative}
+.sfxt .pv canvas{grid-column:1/-1;width:100%;height:28px;opacity:.75}
+.sfxt .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sfxt .du{font-family:var(--mono);font-size:11px;color:var(--mute);align-self:center}
+.sfxt .bar{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--c-aud)}
+.sfxt.playing{border-color:var(--c-aud);box-shadow:0 0 0 1px var(--c-aud)}
+.sfxt.playing canvas{opacity:1}
+.sfxt .add{flex:none;width:44px;border:0;border-left:1px solid var(--line);background:var(--raise2);color:var(--fg);display:grid;place-items:center}
+.sfxt .add:active{background:var(--accent);color:var(--accent-ink)}
+.sfxt.added .add{animation:addflash .6s ease-out}
+@keyframes addflash{0%{background:var(--accent);color:var(--accent-ink)}100%{background:var(--raise2);color:var(--fg)}}
 .medialist{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
 .mtile{position:relative;background:var(--raise);border:1px solid var(--line);border-radius:9px;overflow:hidden;padding:0;text-align:left}
 .mtile .th{aspect-ratio:1;background:#000 center/cover no-repeat;display:block}
@@ -992,7 +1005,7 @@ function runAct(a) {
 /* ============ Bottom sheet framework ============ */
 let sheet = null; // {kind, data}
 function openSheet(kind, data = {}) { sheet = { kind, data }; renderSheet(); }
-function closeSheet() { sheet = null; $('#sheet').hidden = true; previewAnims.length = 0; }
+function closeSheet() { stopPreview(); sheet = null; $('#sheet').hidden = true; previewAnims.length = 0; }
 function openSheetIfOpen() { if (sheet) renderSheet(); }
 $('#sheetClose').onclick = closeSheet;
 function fmtV(v, unit) { v = +v; if (unit === '%') return Math.round(v * 100) + '%'; if (unit === 's') return v.toFixed(2) + 's'; if (unit === '×') return v.toFixed(2) + '×'; if (unit === '°') return Math.round(v) + '°'; return String(Math.round(v * 10) / 10); }
@@ -1127,10 +1140,10 @@ function renderSheet() {
       title = 'Audio'; const cat = sheet.data.sfxCat || 'Transitions';
       h = `<input class="input" type="search" id="sfxQ" data-k="@q" data-num="no" placeholder="Search ${Object.keys(SFX_DEF).length} sounds" aria-label="Search sounds" value="${esc(sheet.data.q || '')}">` +
         `<div class="seg chips" data-seg="@sfxcat">${SFX_CATS.map(c => `<button data-val="${esc(c)}" aria-pressed="${c === cat}">${c}</button>`).join('')}</div>` +
-        `<div class="grid" id="sfxGrid">${Object.entries(SFX_DEF).map(([id, d]) => `<button class="opt" data-pick="sfx" data-val="${id}" data-cat="${esc(d.cat)}" data-name="${esc((d.name + ' ' + (d.tags || '') + ' ' + d.cat).toLowerCase())}">${ico('audio')}<span>${d.name}</span></button>`).join('')}</div>` +
-        `<p class="note" id="sfxNone" hidden>No sounds match. Try another word.</p><p class="note">Tap a sound to hear it and drop it at the playhead.</p>` +
+        `<div class="sfxgrid" id="sfxGrid">${Object.entries(SFX_DEF).map(([id, d]) => `<div class="sfxt" data-sfx="${id}" data-cat="${esc(d.cat)}" data-name="${esc((d.name + ' ' + (d.tags || '') + ' ' + d.cat).toLowerCase())}"><button class="pv" data-do="sfxPrev" data-id="${id}" aria-label="Play ${esc(d.name)}"><canvas width="120" height="34" data-wavek="${id}"></canvas><span class="nm">${d.name}</span><span class="du">${SFX[id] ? SFX[id].duration.toFixed(1) + 's' : ''}</span><i class="bar"></i></button><button class="add" data-do="sfxAdd" data-id="${id}" aria-label="Add ${esc(d.name)} to the timeline">${ico('add')}</button></div>`).join('')}</div>` +
+        `<p class="note" id="sfxNone" hidden>No sounds match. Try another word.</p><p class="note">Tap a sound to hear it. Tap <b>+</b> to add it at the playhead (${fmt(clock.t)}).</p>` +
         sec('Music and voice', `<div class="row"><button class="btn primary small" data-do="music">${ico('add')}Add from phone</button></div>` + mediaTiles(['audio', 'video'], 'addAud'));
-      setTimeout(filterSfx);
+      setTimeout(() => { filterSfx(); drawSfxWaves(); });
       break;
     }
     case 'add': title = sheet.data.track === 'ovl' ? 'Add an overlay' : 'Add to the video track'; h = `<div class="row"><button class="btn primary" data-do="pick">${ico('add')}Choose from phone</button></div>` + mediaTiles(['video', 'image', 'gen'], 'useMedia') + (sheet.data.track === 'ovl' ? '<p class="note">PNG cut-outs with transparent backgrounds work best for pop-ins. Photos look good with the Photo card look.</p>' : ''); break;
@@ -1149,7 +1162,7 @@ function mediaTiles(kinds, act) {
 }
 function filterSfx() {
   const g = $('#sfxGrid'); if (!g || !sheet) return; const q = (sheet.data.q || '').trim().toLowerCase(), cat = sheet.data.sfxCat || 'Transitions'; let shown = 0;
-  $$('.opt', g).forEach(b => { const on = q ? q.split(/\s+/).every(w => b.dataset.name.includes(w)) : b.dataset.cat === cat; b.hidden = !on; if (on) shown++; });
+  $$('.sfxt', g).forEach(b => { const on = q ? q.split(/\s+/).every(w => b.dataset.name.includes(w)) : b.dataset.cat === cat; b.hidden = !on; if (on) shown++; });
   $$('[data-seg="@sfxcat"] button', $('#sheetBody')).forEach(b => b.setAttribute('aria-pressed', !q && b.dataset.val === cat));
   const none = $('#sfxNone'); if (none) none.hidden = shown > 0;
 }
@@ -1178,6 +1191,8 @@ async function sheetDo(a, el) {
     case 'cancelExport': if (exportState) exportState.cancel = true; return;
     case 'save': if (lastExport) saveFile(lastExport.name, lastExport.blob); return;
     case 'toCaptions': return goCaptions(true);
+    case 'sfxPrev': return previewSfx(el.dataset.id);
+    case 'sfxAdd': { addSfx(el.dataset.id); const t = el.closest('.sfxt'); if (t) { t.classList.remove('added'); void t.offsetWidth; t.classList.add('added'); } return; }
   }
 }
 
@@ -1207,7 +1222,23 @@ $('#fileAudio').addEventListener('change', async e => {
 function addText() { const s = TEXT_STYLES.fact; const { name, ...rest } = s; const x = Object.assign({ id: uid(), text: 'Your fact goes here', start: clock.t, dur: 2.5, x: .5, intro: 'pop', outro: 'fade', introD: .3, outroD: .2 }, rest); mutate(() => P.text.push(x)); P.demo = false; sel = { track: 'text', id: x.id }; renderTools(); openSheet('text'); }
 const VFX_DUR = { flash: .4, punch: .5, zoomblur: .4, glitch: .7, strobe: .8 };
 function addVfx(type) { const v = { id: uid(), type, start: clock.t, dur: VFX_DUR[type] || 1.5, k: .6 }; mutate(() => P.vfx.push(v)); sel = { track: 'vfx', id: v.id }; tlDirty = true; renderTools(); openSheet('vfx'); if (!playing) markDirty(); }
-function addSfx(k) { audition(k); mutate(() => P.aud.push(newAud('sfx:' + k, sfxAt(k, clock.t)))); toast(`${SFX_DEF[k].name} added at ${fmt(clock.t)}`); }
+function addSfx(k) { mutate(() => P.aud.push(newAud('sfx:' + k, sfxAt(k, clock.t)))); toast(`${SFX_DEF[k].name} added at ${fmt(clock.t)}`); }
+let pvSrc = null, pvId = null;
+function stopPreview() { if (pvSrc) { try { pvSrc.onended = null; pvSrc.stop(); } catch (e) { } } pvSrc = null; const t = pvId && document.querySelector(`.sfxt[data-sfx="${pvId}"]`); if (t) t.classList.remove('playing'); pvId = null; }
+function previewSfx(k) {
+  const same = pvId === k; stopPreview(); if (same) return;
+  ensureAudio(); if (!actx) return; actx.resume(); if (playing) pause();
+  const s = actx.createBufferSource(); s.buffer = sfxBuf(k); s.connect(actx.destination); s.start(); pvSrc = s; pvId = k;
+  const t = document.querySelector(`.sfxt[data-sfx="${k}"]`); if (t) { const bar = t.querySelector('.bar'); bar.style.transition = 'none'; bar.style.width = '0'; void bar.offsetWidth; bar.style.transition = `width ${s.buffer.duration}s linear`; bar.style.width = '100%'; t.classList.add('playing'); }
+  s.onended = () => { if (pvSrc === s) stopPreview(); };
+}
+function drawSfxWaves() {
+  $$('canvas[data-wavek]', $('#sheetBody')).forEach(cv => {
+    const b = SFX[cv.dataset.wavek]; if (!b) return; const pk = peaksOf(b, cv.width).data, g = cv.getContext('2d'), H = cv.height; let mx = 0; pk.forEach(v => mx = Math.max(mx, v));
+    g.clearRect(0, 0, cv.width, H); g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--c-aud') || '#4fd18b';
+    for (let x = 0; x < cv.width && x < pk.length; x += 2) { const h = Math.max(1.5, pk[x] / (mx || 1) * (H - 4)); g.fillRect(x, (H - h) / 2, 1.4, h); }
+  });
+}
 function splitSel() {
   const it = selItem(); if (!it) return; const t = clock.t;
   if (sel.track === 'main') {
