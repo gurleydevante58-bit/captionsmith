@@ -97,6 +97,12 @@ a.btn{text-decoration:none;color:var(--fg)}
 .tchip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .tchip svg{width:12px;height:12px}
 .addend{position:absolute;top:9px;width:36px;height:36px;border-radius:8px;background:var(--fg);color:var(--bg);border:0;display:grid;place-items:center}
+.track.drop{display:none}
+.dragging-ovl .track.drop{display:block}
+.track.drop .lane{border:1.5px dashed var(--line);border-radius:8px;margin:0 6px}
+.track.over .lane{background:var(--accent-soft)}
+.track.drop.over .lane{border-color:var(--accent)}
+.track.ovl-top .item.ovl{box-shadow:inset 0 2px 0 var(--accent)}
 .playhead{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:#fff;z-index:6;pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
 .playhead::before{content:"";position:absolute;top:0;left:-5px;width:12px;height:8px;background:#fff;clip-path:polygon(0 0,100% 0,50% 100%)}
 
@@ -890,7 +896,9 @@ function renderTimeline() {
   let h = `<div class="ruler" style="width:${W}px">`; const st = rulerStep(pps);
   for (let t = 0; t <= D + st; t += st) h += `<b style="left:${pad + t * pps}px"></b><span style="left:${pad + t * pps}px">${t >= 60 ? Math.floor(t / 60) + ':' + String(Math.round(t % 60)).padStart(2, '0') : (Math.round(t * 100) / 100) + 's'}</span>`;
   P.beats.forEach(b => h += `<em style="left:${pad + b * pps - 1}px"></em>`); h += '</div>';
-  for (const track of TRACKS) {
+  const ovlTop = P.ovl.filter(o => o.aboveFx), ovlLow = P.ovl.filter(o => !o.aboveFx);
+  const GROUPS = [['text', P.text], ['ovl', ovlTop, 'top'], ['vfx', P.vfx], ['ovl', ovlLow, 'low'], ['main'], ['aud', P.aud]];
+  for (const [track, list, layer] of GROUPS) {
     if (track === 'main') {
       h += `<div class="track main" data-track="main"><div class="lane">`;
       const L = mainLayout();
@@ -906,8 +914,10 @@ function renderTimeline() {
       if (!L.length) h += `<span class="tag" style="left:${pad + 56}px">Tap + to add videos or pictures</span>`;
       h += `</div></div>`; continue;
     }
-    const items = P[track]; if (!items.length) continue; const n = assignLanes(items);
-    h += `<div class="track" data-track="${track}">`;
+    const items = list; const isOvl = track === 'ovl';
+    if (!items.length) { if (isOvl && P.ovl.length && (layer === 'top' ? P.vfx.length : true)) h += `<div class="track drop" data-track="ovl" data-layer="${layer}"><div class="lane"><span class="tag" style="left:${pad + 8}px">${layer === 'top' ? 'Drop here to put it above effects' : 'Drop here to put it under effects'}</span></div></div>`; continue; }
+    const n = assignLanes(items);
+    h += `<div class="track${isOvl ? ' ovl-' + layer : ''}" data-track="${track}"${layer ? ` data-layer="${layer}"` : ''}>`;
     for (let l = 0; l < n; l++) {
       h += `<div class="lane">`;
       items.filter(it => it._lane === l).forEach(it => {
@@ -950,10 +960,11 @@ tl.inner.addEventListener('pointerdown', e => {
   const h = e.target.dataset.h || 'move';
   if (track === 'main' && h === 'move' && P.main.length < 2) return;
   e.preventDefault(); el.setPointerCapture(e.pointerId);
-  drag = { el, track, it, h, x0: e.clientX, moved: false, orig: clone(it), idx: P.main.indexOf(it), left0: parseFloat(el.style.left), w0: parseFloat(el.style.width), snap: SNAP() };
+  drag = { el, track, it, h, x0: e.clientX, y0: e.clientY, moved: false, orig: clone(it), idx: P.main.indexOf(it), left0: parseFloat(el.style.left), w0: parseFloat(el.style.width), snap: SNAP() };
 });
 tl.inner.addEventListener('pointermove', e => {
-  if (!drag) return; const dx = e.clientX - drag.x0; if (!drag.moved && Math.abs(dx) < 4) return; drag.moved = true;
+  if (!drag) return; const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0; if (!drag.moved && Math.abs(dx) < 4 && Math.abs(dy) < 6) return; drag.moved = true;
+  if (drag.track === 'ovl' && drag.h === 'move') { drag.el.style.transform = `translateY(${dy}px)`; drag.el.style.zIndex = 9; drag.el.style.pointerEvents = 'none'; tl.inner.classList.add('dragging-ovl'); const tr = dropTrack(e); $$('.track', tl.inner).forEach(t => t.classList.toggle('over', t === tr)); }
   const d = drag, it = d.it, o = d.orig, pps = tl.pps, dt = dx / pps;
   if (d.track === 'main') {
     if (d.h === 'move') { d.el.style.transform = `translateX(${dx}px)`; d.el.style.zIndex = 9; d.el.style.opacity = .85; return; }
@@ -968,8 +979,14 @@ tl.inner.addEventListener('pointermove', e => {
   }
   markDirty();
 });
+function dropTrack(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest('#tlInner .track'); }
 function endDrag(e) {
-  if (!drag) return; const d = drag; drag = null;
+  if (!drag) return; const d = drag; drag = null; tl.inner.classList.remove('dragging-ovl');
+  if (d.moved && d.track === 'ovl' && d.h === 'move') {
+    const tr = dropTrack(e); let above = d.it.aboveFx;
+    if (tr) { const k = tr.dataset.track, ly = tr.dataset.layer; if (k === 'text' || k === 'vfx' || ly === 'top') above = true; else if (k === 'main' || k === 'aud' || ly === 'low') above = false; }
+    if (!!above !== !!d.it.aboveFx) { d.it.aboveFx = !!above; toast(above ? 'Overlay is now above effects' : 'Overlay is now under effects'); }
+  }
   if (d.moved) {
     if (d.track === 'main' && d.h === 'move') {
       const dx = e.clientX - d.x0, center = (d.left0 - padL()) / tl.pps + mainDur(d.it) / 2 + dx / tl.pps; const L = mainLayout().filter(x => x.c !== d.it);
@@ -1165,7 +1182,7 @@ function renderSheet() {
       break;
     case 'look': {
       title = 'Look'; const m = media[it.m];
-      h = sec('Layer', F.seg('aboveFx', [[false, 'Under effects'], [true, 'Above effects']], !!it.aboveFx) + '<p class="note">Above effects keeps this overlay sharp and clean when a Blur, Glitch, Shake or other effect is on.</p>') +
+      h = `<p class="note">${it.aboveFx ? 'This overlay is <b>above effects</b>, so it stays sharp.' : 'This overlay is <b>under effects</b>, so effects change it too.'} Drag it up or down past the Effects row on the timeline to change that.</p>` +
         sec('Frame', F.seg('look', [['none', 'Plain'], ['shadow', 'Shadow'], ['card', 'Photo card']], it.look || 'none')) + F.range('Size', 'scale', it.scale, .05, 2, .01, '%') + F.range('Rotate', 'rot', it.rot || 0, -180, 180, 1, '°') + F.range('Opacity', 'opacity', it.opacity ?? 1, 0, 1, .02, '%') +
         (m && m.kind === 'video' ? F.range('Volume', 'vol', it.vol ?? 0, 0, 2, .05, '%') : '') + '<p class="note">Drag it on the preview to move it; pinch with two fingers to resize and rotate.</p>'; break;
     }
@@ -1184,7 +1201,7 @@ function renderSheet() {
       title = k === 'vfx' ? 'Effect' : 'Add an effect at the playhead';
       h = F.seg('@cat', VFX_CATS.map(c => [c, c]), cat) + F.grid('type', Object.entries(VFX).filter(([, v]) => v.cat === cat).map(([id, v]) => [id, v.name]), k === 'vfx' ? it.type : '', 'vfx');
       if (k === 'vfx') h += F.range('Intensity', 'k', it.k ?? .6, 0, 1, .02, '%') + '<p class="note">Drag the effect bar\'s ends on the timeline to set how long it lasts.</p>';
-      else h += '<p class="note">Effects apply to the video and overlays underneath them. Text stays crisp on top. To keep an overlay sharp, select it and set Look → Layer → Above effects.</p>';
+      else h += '<p class="note">Effects apply to the video and overlays underneath them. Text stays crisp on top. To keep an overlay sharp, drag it above the Effects row on the timeline.</p>';
       break;
     }
     case 'audio': {
