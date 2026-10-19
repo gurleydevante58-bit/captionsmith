@@ -97,12 +97,9 @@ a.btn{text-decoration:none;color:var(--fg)}
 .tchip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .tchip svg{width:12px;height:12px}
 .addend{position:absolute;top:9px;width:36px;height:36px;border-radius:8px;background:var(--fg);color:var(--bg);border:0;display:grid;place-items:center}
-.track.drop{display:none}
-.dragging-ovl .track.drop{display:block}
-.track.drop .lane{border:1.5px dashed var(--line);border-radius:8px;margin:0 6px}
 .track.over .lane{background:var(--accent-soft)}
-.track.drop.over .lane{border-color:var(--accent)}
-.track.ovl-top .item.ovl{box-shadow:inset 0 2px 0 var(--accent)}
+.track.ins-top .lane{box-shadow:0 -3px 0 var(--accent)}
+.track.ins-bot .lane{box-shadow:0 3px 0 var(--accent)}
 .playhead{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:#fff;z-index:6;pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
 .playhead::before{content:"";position:absolute;top:0;left:-5px;width:12px;height:8px;background:#fff;clip-path:polygon(0 0,100% 0,50% 100%)}
 
@@ -309,7 +306,8 @@ const ICON = {
   anim: '<circle cx="8" cy="12" r="4"/><path d="M14 8a6 6 0 0 1 0 8M18 6a9 9 0 0 1 0 12"/>', kb: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 10h3V7M16 14h-3v3"/>',
   fx: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18" opacity=".5"/>', adj: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
   tr: '<path d="M4 4h7v16H4zM13 4l7 8-7 8"/>', back: '<path d="M15 6l-6 6 6 6"/>', crop: '<path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/>',
-  front: '<path d="M12 19V5M5 12l7-7 7 7"/>', replace: '<path d="M4 4v6h6M20 20v-6h-6"/><path d="M20 10A8 8 0 0 0 6 5.3L4 7.5M4 14a8 8 0 0 0 14 4.7l2-2.2"/>',
+  front: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  back: '<path d="M12 5v14M5 12l7 7 7-7"/>', replace: '<path d="M4 4v6h6M20 20v-6h-6"/><path d="M20 10A8 8 0 0 0 6 5.3L4 7.5M4 14a8 8 0 0 0 14 4.7l2-2.2"/>',
   style: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>', cap: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h10"/>',
   fade: '<path d="M3 20 21 4"/><path d="M3 20h18V4"/>',
   shape: '<path d="M7 6.5c3.5-2.6 11.5-2.3 13.2 1.6 1.7 4-3 9.6-9.4 9.6S1.6 14.6 3 10.2c1.1-3.5 5.2-5.4 9.8-5.2"/><path d="M15 20.5h6"/>', play: '<path d="m8 5 11 7-11 7z"/>'
@@ -371,7 +369,12 @@ function mutate(fn, key) {
 function restore(s) { Object.assign(P, JSON.parse(s)); if (sel && !findItem(sel)) sel = null; afterChange(); renderTools(); }
 function undo() { if (!hist.undo.length) return; hist.redo.push(SNAP()); restore(hist.undo.pop()); hist.key = null; toast('Undone'); }
 function redo() { if (!hist.redo.length) return; hist.undo.push(SNAP()); restore(hist.redo.pop()); hist.key = null; toast('Redone'); }
-function afterChange() { $('#undoBtn').disabled = !hist.undo.length; $('#redoBtn').disabled = !hist.redo.length; tlDirty = true; markDirty(); scheduleSave(); }
+/* Layers: overlays, shapes and effects share one stack. Higher z is drawn later, so it sits on top. Text is always on top. */
+function zOf(kind, it, i) { return it.z != null ? it.z : kind === 'vfx' ? 1000 + i : (it.aboveFx ? 2000 : 0) + i; }
+function layerList() { return [...P.ovl.map((o, i) => ({ k: 'ovl', it: o, z: zOf('ovl', o, i) })), ...P.vfx.map((v, i) => ({ k: 'vfx', it: v, z: zOf('vfx', v, i) }))].sort((a, b) => a.z - b.z); }
+function normZ() { layerList().forEach((l, i) => { l.it.z = i; if ('aboveFx' in l.it) delete l.it.aboveFx; }); }
+function topZ() { return layerList().reduce((m, l) => Math.max(m, l.z), -1) + 1; }
+function afterChange() { normZ(); $('#undoBtn').disabled = !hist.undo.length; $('#redoBtn').disabled = !hist.redo.length; tlDirty = true; markDirty(); scheduleSave(); }
 
 /* ============ Storage (IndexedDB) ============ */
 let idb = null, idbFailed = false;
@@ -875,9 +878,7 @@ function active(it, t) { return t >= it.start && t < it.start + it.dur; }
 function renderFrame(g, W, H, t) {
   frameNo++;
   renderMain(g, W, H, t);
-  for (const o of P.ovl) if (!o.aboveFx && active(o, t)) drawOverlay(g, W, H, o, t);
-  for (const v of P.vfx) if (active(v, t) && VFX[v.type]) { g.save(); VFX[v.type].fn(g, W, H, v.k ?? .6, t - v.start, v.dur, t); g.restore(); }
-  for (const o of P.ovl) if (o.aboveFx && active(o, t)) drawOverlay(g, W, H, o, t);
+  for (const l of layerList()) { const it = l.it; if (!active(it, t)) continue; if (l.k === 'vfx') { if (VFX[it.type]) { g.save(); VFX[it.type].fn(g, W, H, it.k ?? .6, t - it.start, it.dur, t); g.restore(); } } else drawOverlay(g, W, H, it, t); }
   for (const x of P.text) if (active(x, t)) drawText(g, W, H, x, t);
 }
 
@@ -988,8 +989,7 @@ function renderTimeline() {
   let h = `<div class="ruler" style="width:${W}px">`; const st = rulerStep(pps);
   for (let t = 0; t <= D + st; t += st) h += `<b style="left:${pad + t * pps}px"></b><span style="left:${pad + t * pps}px">${t >= 60 ? Math.floor(t / 60) + ':' + String(Math.round(t % 60)).padStart(2, '0') : (Math.round(t * 100) / 100) + 's'}</span>`;
   P.beats.forEach(b => h += `<em style="left:${pad + b * pps - 1}px"></em>`); h += '</div>';
-  const ovlTop = P.ovl.filter(o => o.aboveFx), ovlLow = P.ovl.filter(o => !o.aboveFx);
-  const GROUPS = [['text', P.text], ['ovl', ovlTop, 'top'], ['vfx', P.vfx], ['ovl', ovlLow, 'low'], ['main'], ['aud', P.aud]];
+  const GROUPS = [['text', P.text], ['layers'], ['main'], ['aud', P.aud]];
   for (const [track, list, layer] of GROUPS) {
     if (track === 'main') {
       h += `<div class="track main" data-track="main"><div class="lane">`;
@@ -1006,10 +1006,20 @@ function renderTimeline() {
       if (!L.length) h += `<span class="tag" style="left:${pad + 56}px">Tap + to add videos or pictures</span>`;
       h += `</div></div>`; continue;
     }
-    const items = list; const isOvl = track === 'ovl';
-    if (!items.length) { if (isOvl && P.ovl.length && (layer === 'top' ? P.vfx.length : true)) h += `<div class="track drop" data-track="ovl" data-layer="${layer}"><div class="lane"><span class="tag" style="left:${pad + 8}px">${layer === 'top' ? 'Drop here to put it above effects' : 'Drop here to put it under effects'}</span></div></div>`; continue; }
+    if (track === 'layers') {
+      // one row per block of the layer stack (top = in front); items that never overlap in time share a row
+      const rows = []; for (const l of layerList().reverse()) { const last = rows[rows.length - 1]; const fits = last && last.k === l.k && !last.items.some(o => o.it.start < l.it.start + l.it.dur - 1e-3 && l.it.start < o.it.start + o.it.dur - 1e-3); if (fits) last.items.push(l); else rows.push({ k: l.k, items: [l] }); }
+      tl.rows = rows.map(r => ({ ids: r.items.map(l => l.it.id), zs: r.items.map(l => l.z) }));
+      rows.forEach((r, ri) => {
+        h += `<div class="track layer" data-track="${r.k}" data-row="${ri}"><div class="lane">`;
+        r.items.forEach(({ it }) => { const x = pad + it.start * pps, w = Math.max(8, it.dur * pps), isSel = sel && sel.id === it.id; h += `<div class="item ${r.k}${isSel ? ' sel' : ''}" data-track="${r.k}" data-id="${it.id}" style="left:${x}px;width:${w}px"><span class="nm">${itemLabel(r.k, it)}</span><span class="hd l" data-h="l"></span><span class="hd r" data-h="r"></span></div>`; });
+        h += `</div></div>`;
+      });
+      continue;
+    }
+    const items = list; if (!items.length) continue;
     const n = assignLanes(items);
-    h += `<div class="track${isOvl ? ' ovl-' + layer : ''}" data-track="${track}"${layer ? ` data-layer="${layer}"` : ''}>`;
+    h += `<div class="track" data-track="${track}">`;
     for (let l = 0; l < n; l++) {
       h += `<div class="lane">`;
       items.filter(it => it._lane === l).forEach(it => {
@@ -1056,7 +1066,7 @@ tl.inner.addEventListener('pointerdown', e => {
 });
 tl.inner.addEventListener('pointermove', e => {
   if (!drag) return; const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0; if (!drag.moved && Math.abs(dx) < 4 && Math.abs(dy) < 6) return; drag.moved = true;
-  if (drag.track === 'ovl' && drag.h === 'move') { drag.el.style.transform = `translateY(${dy}px)`; drag.el.style.zIndex = 9; drag.el.style.pointerEvents = 'none'; tl.inner.classList.add('dragging-ovl'); const tr = dropTrack(e); $$('.track', tl.inner).forEach(t => t.classList.toggle('over', t === tr)); }
+  if ((drag.track === 'ovl' || drag.track === 'vfx') && drag.h === 'move') { drag.el.style.transform = `translateY(${dy}px)`; drag.el.style.zIndex = 9; drag.el.style.pointerEvents = 'none'; const tr = dropTrack(e), up = tr && e.clientY < tr.getBoundingClientRect().top + tr.getBoundingClientRect().height / 2; $$('.track', tl.inner).forEach(t => { t.classList.toggle('ins-top', t === tr && up); t.classList.toggle('ins-bot', t === tr && !up); }); }
   const d = drag, it = d.it, o = d.orig, pps = tl.pps, dt = dx / pps;
   if (d.track === 'main') {
     if (d.h === 'move') { d.el.style.transform = `translateX(${dx}px)`; d.el.style.zIndex = 9; d.el.style.opacity = .85; return; }
@@ -1073,11 +1083,16 @@ tl.inner.addEventListener('pointermove', e => {
 });
 function dropTrack(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest('#tlInner .track'); }
 function endDrag(e) {
-  if (!drag) return; const d = drag; drag = null; tl.inner.classList.remove('dragging-ovl');
-  if (d.moved && d.track === 'ovl' && d.h === 'move') {
-    const tr = dropTrack(e); let above = d.it.aboveFx;
-    if (tr) { const k = tr.dataset.track, ly = tr.dataset.layer; if (k === 'text' || k === 'vfx' || ly === 'top') above = true; else if (k === 'main' || k === 'aud' || ly === 'low') above = false; }
-    if (!!above !== !!d.it.aboveFx) { d.it.aboveFx = !!above; toast(above ? 'Overlay is now above effects' : 'Overlay is now under effects'); }
+  if (!drag) return; const d = drag; drag = null; $$('.track', tl.inner).forEach(t => t.classList.remove('ins-top', 'ins-bot'));
+  if (d.moved && (d.track === 'ovl' || d.track === 'vfx') && d.h === 'move') {
+    const tr = dropTrack(e), old = d.it.z; let nz = null;
+    if (tr) {
+      const r = tr.getBoundingClientRect(), up = e.clientY < r.top + r.height / 2;
+      if (tr.dataset.row != null) { const row = tl.rows[+tr.dataset.row]; const zs = row.zs.filter((z, i) => row.ids[i] !== d.it.id); if (zs.length) nz = up ? Math.max(...zs) + .5 : Math.min(...zs) - .5; }
+      else if (tr.dataset.track === 'text') nz = topZ() + 1;
+      else if (tr.dataset.track === 'main' || tr.dataset.track === 'aud') nz = -1;
+    }
+    if (nz != null && nz !== old) { d.it.z = nz; normZ(); if (d.it.z !== old) toast('Layer moved ' + (d.it.z > old ? 'up' : 'down')); }
   }
   if (d.moved) {
     if (d.track === 'main' && d.h === 'move') {
@@ -1096,7 +1111,7 @@ $('#snapBtn').onclick = () => { snapOn = !snapOn; $('#snapBtn').setAttribute('ar
 /* ============ Preview: tap to select, drag to move, pinch to resize/rotate ============ */
 const pv = { pts: new Map(), mode: null };
 function hitPreview(px, py) {
-  const t = clock.t; const cand = [...P.text.filter(x => active(x, t)).reverse().map(x => ['text', x]), ...P.ovl.filter(o => active(o, t)).reverse().map(o => ['ovl', o])];
+  const t = clock.t; const cand = [...P.text.filter(x => active(x, t)).reverse().map(x => ['text', x]), ...P.ovl.filter(o => active(o, t)).sort((a, b) => (b.z ?? 0) - (a.z ?? 0)).map(o => ['ovl', o])];
   for (const [track, it] of cand) { const b = boxes[it.id]; if (b && px >= b.x - 12 && px <= b.x + b.w + 12 && py >= b.y - 12 && py <= b.y + b.h + 12) return { track, it }; }
   return null;
 }
@@ -1135,10 +1150,10 @@ function select(track, id) { sel = track ? { track, id } : null; tlDirty = true;
 const TOOLSETS = {
   root: [['media', 'Video', 'addMain'], ['ovl', 'Overlay', 'addOvl'], ['text', 'Text', 'addText'], ['shape', 'Shapes', 'sheet:shapes'], ['audio', 'Audio', 'sheet:audio'], ['vfx', 'Effects', 'sheet:vfxnew'], ['tmpl', 'Fact Short', 'sheet:template', 'hot'], ['auto', 'Automate', 'sheet:automate', 'hot'], ['beat', 'Beats', 'sheet:beats'], ['crop', 'Canvas', 'sheet:canvas'], ['cap', 'Captions', 'captions'], ['media', 'Projects', 'home']],
   main: [['crop', 'Move & size', 'sheet:transform'], ['split', 'Split', 'split'], ['tr', 'Transition', 'sheet:transition'], ['anim', 'Intro', 'sheet:anim'], ['kb', 'Ken Burns', 'sheet:kb'], ['adj', 'Adjust', 'sheet:adjust'], ['speed', 'Speed', 'sheet:speed'], ['vol', 'Volume', 'sheet:volume'], ['crop', 'Fit / fill', 'fit'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
-  ovl: [['split', 'Split', 'split'], ['anim', 'Animate', 'sheet:anim'], ['style', 'Look', 'sheet:look'], ['kb', 'Ken Burns', 'sheet:kb'], ['adj', 'Adjust', 'sheet:adjust'], ['front', 'To front', 'front'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
-  shape: [['shape', 'Shape', 'sheet:shape'], ['anim', 'Animate', 'sheet:anim'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
+  ovl: [['split', 'Split', 'split'], ['anim', 'Animate', 'sheet:anim'], ['style', 'Look', 'sheet:look'], ['kb', 'Ken Burns', 'sheet:kb'], ['adj', 'Adjust', 'sheet:adjust'], ['front', 'To top', 'front'], ['back', 'To bottom', 'back'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
+  shape: [['shape', 'Shape', 'sheet:shape'], ['anim', 'Animate', 'sheet:anim'], ['front', 'To top', 'front'], ['back', 'To bottom', 'back'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
   text: [['style', 'Edit', 'sheet:text'], ['anim', 'Animate', 'sheet:anim'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
-  vfx: [['vfx', 'Effect', 'sheet:vfx'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
+  vfx: [['vfx', 'Effect', 'sheet:vfx'], ['front', 'To top', 'front'], ['back', 'To bottom', 'back'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
   aud: [['vol', 'Volume', 'sheet:volume'], ['beat', 'Find beats', 'beatsFrom'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']]
 };
 function renderTools() {
@@ -1162,7 +1177,8 @@ function runAct(a) {
     case 'dup': return dupSel();
     case 'del': return delSel();
     case 'fit': if (it) { mutate(() => it.fit = (it.fit || 'fill') === 'fill' ? 'fit' : 'fill'); toast(it.fit === 'fit' ? 'Fit: whole picture, blurred background fills the gaps' : 'Fill: picture covers the frame'); } return;
-    case 'front': if (it) { mutate(() => { P.ovl = P.ovl.filter(x => x !== it); P.ovl.push(it); }); toast('Moved to front'); } return;
+    case 'front': if (it) { mutate(() => { it.z = topZ(); }); toast('Moved to the top layer'); } return;
+    case 'back': if (it) { mutate(() => { it.z = -1; }); toast('Moved to the bottom layer'); } return;
     case 'beatsFrom': return detectBeatsFrom(it);
   }
 }
@@ -1288,7 +1304,7 @@ function renderSheet() {
       break;
     case 'look': {
       title = 'Look'; const m = media[it.m];
-      h = `<p class="note">${it.aboveFx ? 'This overlay is <b>above effects</b>, so it stays sharp.' : 'This overlay is <b>under effects</b>, so effects change it too.'} Drag it up or down past the Effects row on the timeline to change that.</p>` +
+      h = '<p class="note">Layers higher up on the timeline sit on top. Drag this overlay up or down to put it above or below an effect.</p>' +
         sec('Frame', F.seg('look', [['none', 'Plain'], ['shadow', 'Shadow'], ['card', 'Photo card']], it.look || 'none')) + F.range('Size', 'scale', it.scale, .05, 2, .01, '%') + F.range('Rotate', 'rot', it.rot || 0, -180, 180, 1, '°') + F.range('Opacity', 'opacity', it.opacity ?? 1, 0, 1, .02, '%') +
         (m && m.kind === 'video' ? F.range('Volume', 'vol', it.vol ?? 0, 0, 2, .05, '%') : '') + '<p class="note">Drag it on the preview to move it; pinch with two fingers to resize and rotate.</p>'; break;
     }
@@ -1319,7 +1335,7 @@ function renderSheet() {
       title = k === 'vfx' ? 'Effect' : 'Add an effect at the playhead';
       h = F.seg('@cat', VFX_CATS.map(c => [c, c]), cat).replace('class="seg"', 'class="seg chips"') + F.grid('type', Object.entries(VFX).filter(([, v]) => v.cat === cat).map(([id, v]) => [id, v.name]), k === 'vfx' ? it.type : '', 'vfx');
       if (k === 'vfx') h += F.range('Intensity', 'k', it.k ?? .6, 0, 1, .02, '%') + '<p class="note">Drag the effect bar\'s ends on the timeline to set how long it lasts.</p>';
-      else h += '<p class="note">Effects apply to the video and overlays underneath them. Text stays crisp on top. To keep an overlay sharp, drag it above the Effects row on the timeline.</p>';
+      else h += '<p class="note">Effects apply to the video and overlays underneath them. Text stays crisp on top. Drag effects and overlays up or down on the timeline to change which is on top.</p>';
       break;
     }
     case 'audio': {
@@ -1390,7 +1406,7 @@ async function sheetDo(a, el) {
 /* ============ Editing actions ============ */
 function newAud(mid, start) { const m = audioMedia(mid), sfx = mid.startsWith('sfx:'); return { id: uid(), m: mid, start: Math.max(0, start), dur: m ? m.dur : 1, off: 0, vol: sfx ? .8 : 1, fi: 0, fo: sfx ? .03 : 0, kind: sfx ? 'sfx' : 'music' }; }
 function newClip(m) { const still = m.kind !== 'video'; const W = outDims(); const same = m.w && Math.abs(m.w / m.h - W.w / W.h) < .05; return { id: uid(), m: m.id, in: 0, out: still ? 3 : m.dur, speed: 1, vol: 1, kb: still ? 'in' : 'none', kbAmt: .1, fit: same || !still ? 'fill' : 'fit', tr: { type: 'cut', d: .3 }, fx: {}, intro: 'none' }; }
-function newOvl(m) { const still = m.kind !== 'video'; return { id: uid(), m: m.id, start: clock.t, dur: still ? 3 : Math.min(m.dur, 6), in: 0, x: .5, y: .42, scale: (m.w || 1) >= (m.h || 1) ? .8 : .55, rot: 0, opacity: 1, intro: 'pop', outro: 'fade', introD: .35, outroD: .25, kb: 'in', kbAmt: .08, look: 'none', vol: 0 }; }
+function newOvl(m) { const still = m.kind !== 'video'; return { id: uid(), z: topZ(), m: m.id, start: clock.t, dur: still ? 3 : Math.min(m.dur, 6), in: 0, x: .5, y: .42, scale: (m.w || 1) >= (m.h || 1) ? .8 : .55, rot: 0, opacity: 1, intro: 'pop', outro: 'fade', introD: .35, outroD: .25, kb: 'in', kbAmt: .08, look: 'none', vol: 0 }; }
 function placeMedia(m, track) {
   if (track === 'ovl') { const o = newOvl(m); P.ovl.push(o); sel = { track: 'ovl', id: o.id }; }
   else { const c = newClip(m); const L = mainLayout(); const cur = L.find(e => clock.t >= e.start && clock.t < e.end); const idx = cur ? cur.i + 1 : P.main.length; P.main.splice(idx, 0, c); sel = { track: 'main', id: c.id }; }
@@ -1411,10 +1427,10 @@ $('#fileAudio').addEventListener('change', async e => {
   if (!a.length) { toast('No usable sound in that file.', true); return; }
   mutate(() => a.forEach(m => P.aud.push(Object.assign(newAud(m.id, P.aud.some(x => x.kind === 'music') ? clock.t : 0), { dur: m.dur, kind: 'music', vol: .35, fi: .5, fo: 1 })))); closeSheet(); toast('Music added. Try Beats → Find beats.');
 });
-function addShape(type) { const o = { id: uid(), shape: type, start: clock.t, dur: 2.5, x: .5, y: .45, scale: type === 'underline' || type === 'double' || type === 'marker' ? .55 : .5, ar: SHAPES[type].ar, rot: 0, opacity: 1, color: '#FF2D2D', sw: 1, drawD: .45, intro: 'none', outro: 'fade', introD: .2, outroD: .25, aboveFx: true }; mutate(() => P.ovl.push(o)); P.demo = false; sel = { track: 'ovl', id: o.id }; tlDirty = true; closeSheet(); renderTools(); toast(`${SHAPES[type].name} added. Drag it into place, pinch to resize.`); }
+function addShape(type) { const o = { id: uid(), shape: type, start: clock.t, dur: 2.5, x: .5, y: .45, scale: type === 'underline' || type === 'double' || type === 'marker' ? .55 : .5, ar: SHAPES[type].ar, rot: 0, opacity: 1, color: '#FF2D2D', sw: 1, drawD: .45, intro: 'none', outro: 'fade', introD: .2, outroD: .25, z: topZ() }; mutate(() => P.ovl.push(o)); P.demo = false; sel = { track: 'ovl', id: o.id }; tlDirty = true; closeSheet(); renderTools(); toast(`${SHAPES[type].name} added. Drag it into place, pinch to resize.`); }
 function addText() { const s = TEXT_STYLES.fact; const { name, ...rest } = s; const x = Object.assign({ id: uid(), text: 'Your fact goes here', start: clock.t, dur: 2.5, x: .5, intro: 'pop', outro: 'fade', introD: .3, outroD: .2 }, rest); mutate(() => P.text.push(x)); P.demo = false; sel = { track: 'text', id: x.id }; renderTools(); openSheet('text'); }
 const VFX_DUR = { flash: .4, punch: .5, zoomblur: .4, glitch: .7, strobe: .8 };
-function addVfx(type) { const v = { id: uid(), type, start: clock.t, dur: VFX_DUR[type] || 1.5, k: .6 }; mutate(() => P.vfx.push(v)); sel = { track: 'vfx', id: v.id }; tlDirty = true; renderTools(); openSheet('vfx'); if (!playing) markDirty(); }
+function addVfx(type) { const v = { id: uid(), z: topZ(), type, start: clock.t, dur: VFX_DUR[type] || 1.5, k: .6 }; mutate(() => P.vfx.push(v)); sel = { track: 'vfx', id: v.id }; tlDirty = true; renderTools(); openSheet('vfx'); if (!playing) markDirty(); }
 function addSfx(k) { mutate(() => P.aud.push(newAud('sfx:' + k, sfxAt(k, clock.t)))); toast(`${SFX_DEF[k].name} added at ${fmt(clock.t)}`); }
 let pvSrc = null, pvId = null;
 function stopPreview() { if (pvSrc) { try { pvSrc.onended = null; pvSrc.stop(); } catch (e) { } } pvSrc = null; const t = pvId && document.querySelector(`.sfxt[data-sfx="${pvId}"]`); if (t) t.classList.remove('playing'); pvId = null; }
