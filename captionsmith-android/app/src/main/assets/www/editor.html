@@ -639,15 +639,18 @@ function drawClip(g, W, H, c, lt, key) {
   const { img, w: sw, h: sh } = src;
   const cover = Math.max(W / sw, H / sh), contain = Math.min(W / sw, H / sh), fill = (c.fit || 'fill') === 'fill';
   const mismatch = Math.abs(sw / sh - W / H) > .02;
-  if ((!fill && mismatch) && P.bg !== 'black') {
+  const ps0 = c.pos || {}, moved = (ps0.s || 1) < 1 || ps0.x || ps0.y || ps0.r;
+  if (((!fill && mismatch) || moved) && P.bg !== 'black') {
     if (P.bg === 'blur') { g.filter = `blur(${Math.round(W * .035)}px) brightness(.62) saturate(1.2)`; const s = cover * 1.12; g.drawImage(img, (W - sw * s) / 2, (H - sh * s) / 2, sw * s, sh * s); g.filter = 'none'; }
     else { g.fillStyle = P.bg; g.fillRect(0, 0, W, H); }
   }
   const d = mainDur(c), kb = kbXform(c.kb, c.kbAmt, clamp(lt / d, 0, 1), W, H);
   const an = animXf(c.intro, c.introD ? lt / c.introD : 1, W, H);
   const base = fill ? cover : contain;
-  g.translate(W / 2 + kb.x + an.x, H / 2 + kb.y + an.y); if (an.r) g.rotate(an.r);
-  const s = base * kb.s * an.s; g.scale(s, s); g.globalAlpha = an.a;
+  const ps = c.pos || {}, px = (ps.x || 0) * W, py = (ps.y || 0) * H, pz = ps.s || 1, pr = (ps.r || 0) * Math.PI / 180;
+  g.translate(W / 2 + kb.x + an.x + px, H / 2 + kb.y + an.y + py); if (an.r || pr) g.rotate(an.r + pr);
+  const s = base * kb.s * an.s * pz; g.scale(s, s); g.globalAlpha = an.a;
+  boxes[c.id] = { x: W / 2 + px - sw * base * pz / 2, y: H / 2 + py - sh * base * pz / 2, w: sw * base * pz, h: sh * base * pz };
   let f = filterStr(c.fx, c.id); if (an.blur) f = (f === 'none' ? '' : f + ' ') + `blur(${an.blur}px)`;
   g.filter = f || 'none'; g.drawImage(img, -sw / 2, -sh / 2, sw, sh); g.filter = 'none';
   g.restore(); return true;
@@ -1011,24 +1014,29 @@ function hitPreview(px, py) {
 function canvasPt(e) { const r = pc.getBoundingClientRect(); return { x: (e.clientX - r.left) * pc.width / r.width, y: (e.clientY - r.top) * pc.height / r.height }; }
 pc.addEventListener('pointerdown', e => {
   pc.setPointerCapture(e.pointerId); const p = canvasPt(e); pv.pts.set(e.pointerId, p);
+  if (pv.pts.size === 2 && sel && sel.track === 'main') { const it = selItem(); if (it) { const [a, b] = [...pv.pts.values()]; const ps = it.pos || {}; pv.mode = { kind: 'pinchMain', it, d0: Math.hypot(a.x - b.x, a.y - b.y), a0: Math.atan2(b.y - a.y, b.x - a.x), s0: ps.s || 1, r0: ps.r || 0, snap: SNAP(), moved: false }; } return; }
   if (pv.pts.size === 2) { const it = selItem(); if (it && (sel.track === 'ovl' || sel.track === 'text')) { const [a, b] = [...pv.pts.values()]; pv.mode = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), a0: Math.atan2(b.y - a.y, b.x - a.x), s0: sel.track === 'ovl' ? it.scale : it.size, r0: it.rot || 0, snap: SNAP() }; } return; }
   const hit = hitPreview(p.x, p.y);
   if (hit) { if (!(sel && sel.id === hit.it.id)) select(hit.track, hit.it.id); pv.mode = { kind: 'move', it: hit.it, x0: p.x, y0: p.y, ox: hit.it.x, oy: hit.it.y, snap: SNAP(), moved: false }; if (playing) pause(); }
+  else if (sel && sel.track === 'main' && mainLayout().some(e => e.c.id === sel.id && clock.t >= e.start && clock.t < e.end)) { const it = selItem(), ps = it.pos || {}; pv.mode = { kind: 'moveMain', it, x0: p.x, y0: p.y, ox: ps.x || 0, oy: ps.y || 0, snap: SNAP(), moved: false }; if (playing) pause(); }
   else pv.mode = { kind: 'tap', x0: p.x, y0: p.y };
 });
 pc.addEventListener('pointermove', e => {
   if (!pv.pts.has(e.pointerId)) return; const p = canvasPt(e); pv.pts.set(e.pointerId, p); const m = pv.mode; if (!m) return;
+  if (m.kind === 'moveMain') { const dx = (p.x - m.x0) / pc.width, dy = (p.y - m.y0) / pc.height; if (Math.abs(dx) + Math.abs(dy) > .004) m.moved = true; if (!m.moved) return; let nx = m.ox + dx, ny = m.oy + dy; if (Math.abs(nx) < .015) nx = 0; if (Math.abs(ny) < .012) ny = 0; m.it.pos = { ...(m.it.pos || {}), x: clamp(nx, -1, 1), y: clamp(ny, -1, 1) }; markDirty(); return; }
+  if (m.kind === 'pinchMain' && pv.pts.size === 2) { const [a, b] = [...pv.pts.values()]; const k = Math.hypot(a.x - b.x, a.y - b.y) / m.d0; let r = Math.round(m.r0 + (Math.atan2(b.y - a.y, b.x - a.x) - m.a0) * 180 / Math.PI); if (Math.abs(r) < 3) r = 0; let sc = clamp(m.s0 * k, .2, 5); if (Math.abs(sc - 1) < .03) sc = 1; m.it.pos = { ...(m.it.pos || {}), s: +sc.toFixed(3), r }; m.moved = true; markDirty(); return; }
   if (m.kind === 'move') { const dx = (p.x - m.x0) / pc.width, dy = (p.y - m.y0) / pc.height; if (Math.abs(dx) + Math.abs(dy) > .004) m.moved = true; let nx = m.ox + dx, ny = m.oy + dy; if (Math.abs(nx - .5) < .015) nx = .5; if (Math.abs(ny - .5) < .012) ny = .5; m.it.x = clamp(nx, -.2, 1.2); m.it.y = clamp(ny, -.2, 1.2); markDirty(); }
   else if (m.kind === 'pinch' && pv.pts.size === 2) { const it = selItem(); if (!it) return; const [a, b] = [...pv.pts.values()]; const k = Math.hypot(a.x - b.x, a.y - b.y) / m.d0; if (sel.track === 'ovl') { it.scale = clamp(m.s0 * k, .05, 4); it.rot = Math.round(m.r0 + (Math.atan2(b.y - a.y, b.x - a.x) - m.a0) * 180 / Math.PI); } else it.size = clamp(Math.round(m.s0 * k), 12, 260); m.moved = true; markDirty(); }
 });
 function pvUp(e) {
   pv.pts.delete(e.pointerId); const m = pv.mode; if (pv.pts.size) return; pv.mode = null; if (!m) return;
-  if (m.kind === 'tap') { togglePlay(); return; }
+  if (m.kind === 'tap' || (m.kind === 'moveMain' && !m.moved)) { togglePlay(); return; }
   if (m.moved) { hist.undo.push(m.snap); hist.redo = []; hist.key = null; afterChange(); openSheetIfOpen(); }
 }
 pc.addEventListener('pointerup', pvUp); pc.addEventListener('pointercancel', pvUp);
 function placeSelBox() {
-  const box = $('#selBox'); const it = selItem(); if (!it || !(sel.track === 'ovl' || sel.track === 'text') || !active(it, clock.t) || !boxes[it.id]) { box.hidden = true; return; }
+  const box = $('#selBox'); const it = selItem(); const isAct = it && (sel.track === 'main' ? mainLayout().some(e => e.c === it && clock.t >= e.start && clock.t < e.end) : (sel.track === 'ovl' || sel.track === 'text') && active(it, clock.t));
+  if (!it || !isAct || !boxes[it.id]) { box.hidden = true; return; }
   const b = boxes[it.id], r = pc.getBoundingClientRect(), vr = $('#viewer').getBoundingClientRect(), k = r.width / pc.width;
   box.hidden = false; box.style.left = (r.left - vr.left + b.x * k - 4) + 'px'; box.style.top = (r.top - vr.top + b.y * k - 4) + 'px'; box.style.width = (b.w * k + 8) + 'px'; box.style.height = (b.h * k + 8) + 'px';
 }
@@ -1037,7 +1045,7 @@ function placeSelBox() {
 function select(track, id) { sel = track ? { track, id } : null; tlDirty = true; markDirty(); closeSheet(); renderTools(); }
 const TOOLSETS = {
   root: [['media', 'Video', 'addMain'], ['ovl', 'Overlay', 'addOvl'], ['text', 'Text', 'addText'], ['audio', 'Audio', 'sheet:audio'], ['vfx', 'Effects', 'sheet:vfxnew'], ['tmpl', 'Fact Short', 'sheet:template', 'hot'], ['auto', 'Automate', 'sheet:automate', 'hot'], ['beat', 'Beats', 'sheet:beats'], ['crop', 'Canvas', 'sheet:canvas'], ['cap', 'Captions', 'captions'], ['media', 'Projects', 'home']],
-  main: [['split', 'Split', 'split'], ['tr', 'Transition', 'sheet:transition'], ['anim', 'Intro', 'sheet:anim'], ['kb', 'Ken Burns', 'sheet:kb'], ['adj', 'Adjust', 'sheet:adjust'], ['speed', 'Speed', 'sheet:speed'], ['vol', 'Volume', 'sheet:volume'], ['crop', 'Fit / fill', 'fit'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
+  main: [['crop', 'Move & size', 'sheet:transform'], ['split', 'Split', 'split'], ['tr', 'Transition', 'sheet:transition'], ['anim', 'Intro', 'sheet:anim'], ['kb', 'Ken Burns', 'sheet:kb'], ['adj', 'Adjust', 'sheet:adjust'], ['speed', 'Speed', 'sheet:speed'], ['vol', 'Volume', 'sheet:volume'], ['crop', 'Fit / fill', 'fit'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
   ovl: [['split', 'Split', 'split'], ['anim', 'Animate', 'sheet:anim'], ['style', 'Look', 'sheet:look'], ['kb', 'Ken Burns', 'sheet:kb'], ['adj', 'Adjust', 'sheet:adjust'], ['front', 'To front', 'front'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
   text: [['style', 'Edit', 'sheet:text'], ['anim', 'Animate', 'sheet:anim'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
   vfx: [['vfx', 'Effect', 'sheet:vfx'], ['split', 'Split', 'split'], ['dup', 'Duplicate', 'dup'], ['del', 'Delete', 'del']],
@@ -1165,6 +1173,11 @@ function renderSheet() {
       if (sel.track === 'text') h += sec('Words', F.seg('mode', [['static', 'All at once'], ['karaoke', 'Highlight'], ['words', 'Pop each'], ['typewriter', 'Type']], it.mode || 'static'));
       break;
     }
+    case 'transform': { title = 'Move & size'; const ps = it.pos || {};
+      h = '<p class="note">Drag the video on the preview to move it. Pinch with two fingers to resize and rotate. It snaps back to the centre, 100% and 0°.</p>' +
+        F.range('Size', 'pos.s', ps.s || 1, .2, 5, .01, '%') + F.range('Left / right', 'pos.x', ps.x || 0, -1, 1, .01, '%') + F.range('Up / down', 'pos.y', ps.y || 0, -1, 1, .01, '%') + F.range('Rotate', 'pos.r', ps.r || 0, -180, 180, 1, '°') +
+        F.seg('fit', [['fill', 'Fill frame'], ['fit', 'Fit + blurred edges']], it.fit || 'fill') +
+        `<div class="row"><button class="btn small" data-do="resetPos">Reset position</button><button class="btn small" data-do="posAll">Use on every clip</button></div>`; break; }
     case 'kb': title = 'Ken Burns'; h = F.seg('kb', KBS, it.kb || 'none') + F.range('Amount', 'kbAmt', it.kbAmt ?? .12, .02, .5, .01, '%') + '<p class="note">Slow zoom or pan across the shot. FactBites uses a gentle zoom-in on nearly every still.</p>'; break;
     case 'adjust': {
       title = 'Adjust'; const fx = it.fx || {};
@@ -1259,6 +1272,8 @@ async function sheetDo(a, el) {
     case 'cancelExport': if (exportState) exportState.cancel = true; return;
     case 'save': if (lastExport) saveFile(lastExport.name, lastExport.blob); return;
     case 'toCaptions': return goCaptions(true);
+    case 'resetPos': mutate(() => { delete it.pos; }); renderSheet(); return;
+    case 'posAll': { const ps = clone(it.pos || {}); mutate(() => P.main.forEach(c => { c.pos = clone(ps); })); toast('Same position and size on every clip'); return; }
     case 'sfxPrev': return previewSfx(el.dataset.id);
     case 'sfxAdd': { addSfx(el.dataset.id); const t = el.closest('.sfxt'); if (t) { t.classList.remove('added'); void t.offsetWidth; t.classList.add('added'); } return; }
   }
